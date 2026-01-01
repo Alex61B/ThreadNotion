@@ -11,14 +11,90 @@ app.use(express.json());
 // Health
 app.get('/health', (_req: Request, res: Response) => res.json({ ok: true }));
 
+// List Personas
+app.get('/personas', async (_req: Request, res: Response) => {
+  const personas = await prisma.persona.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      tone: true,
+      values: true,
+      instructions: true,
+      createdAt: true,
+    },
+  });
+
+  res.json({ ok: true, personas });
+});
+
+// List Products
+app.get('/products', async (_req: Request, res: Response) => {
+  const products = await prisma.product.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      sku: true,
+      title: true,
+      description: true,
+      brand: true,
+      attributes: true,
+      price: true,
+      currency: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  res.json({ ok: true, products });
+});
+
+// Test LLM
+app.get('/test-llm', async (_req: Request, res: Response) => {
+  try {
+    const response = await llm.chat([
+      { role: 'user', content: 'Say hello! This is a test from /test-llm.' }
+    ]);
+
+    res.json({ ok: true, response });
+  } catch (err) {
+    console.error('LLM ERROR:', err);
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// Test generateScript
+app.get("/test-generate-script", async (req, res) => {
+  try {
+    const script = await llm.generateScript({
+      product: {
+        brand: "Nike",
+        attributes: {
+          material: "breathable Flyknit",
+        }
+      },
+      persona: { name: "Trend-Seeking Shopper" },
+      tone: "hype",
+      steps: 4
+    });
+
+    return res.json({ ok: true, script });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 // --- /chat ---
 const ChatReq = z.object({
   conversationId: z.string().optional(),
   personaId: z.string(),
-  message: z.string().min(1)
+  message: z.string().min(1),
+  mode: z.enum(['roleplay', 'assistant']).optional()
 });
 app.post('/chat', async (req: Request, res: Response) => {
-  const { conversationId, personaId, message } = ChatReq.parse(req.body);
+  const { conversationId, personaId, message, mode } = ChatReq.parse(req.body);
+  const chatMode = mode ?? 'roleplay';
 
   const persona = await prisma.persona.findUnique({ where: { id: personaId }});
   if (!persona) return res.status(404).json({ error: 'persona not found' });
@@ -28,7 +104,7 @@ app.post('/chat', async (req: Request, res: Response) => {
   if (conversationId) {
     const found = await prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { messages: true }
+      include: { messages: { orderBy: { createdAt: 'asc' } } }
     });
 
     if (found) {
@@ -37,19 +113,34 @@ app.post('/chat', async (req: Request, res: Response) => {
       // create a new conversation if the provided ID doesn't exist
       convo = await prisma.conversation.create({
         data: { personaId },
-        include: { messages: true }
+        include: { messages: { orderBy: { createdAt: 'asc' } } }
       });
     }
   } else {
     // no conversationId provided; start a new conversation
     convo = await prisma.conversation.create({
       data: { personaId },
-      include: { messages: true }
+      include: { messages: { orderBy: { createdAt: 'asc' } } }
     });
   }
 
+  const roleplaySystemPrompt = `You are roleplaying as a customer with the following persona: ${persona.name}.
+
+Persona details (traits, preferences, and buying triggers):
+${persona.instructions}
+
+The user is a sales associate trying to sell you a product.
+
+Rules:
+- Respond ONLY as the customer.
+- Be realistic: ask clarifying questions, express preferences, and raise objections.
+- Do not write sales copy or narrate the scene.
+- Keep responses concise (1–5 sentences) unless the associate asks for more detail.`;
+
+  const systemContent = chatMode === 'roleplay' ? roleplaySystemPrompt : persona.instructions;
+
   const history = [
-    { role: 'system' as const, content: persona.instructions },
+    { role: 'system' as const, content: systemContent },
     ...convo.messages.map(m => ({ role: m.role as 'user'|'assistant'|'system', content: m.content })),
     { role: 'user' as const, content: message }
   ];
@@ -72,7 +163,7 @@ app.post('/feedback', async (req: Request, res: Response) => {
   const { conversationId } = FeedbackReq.parse(req.body);
   const convo = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { messages: true, persona: true }
+    include: { messages: { orderBy: { createdAt: 'asc' } }, persona: true }
   });
   if (!convo) return res.status(404).json({ error: 'conversation not found' });
 
