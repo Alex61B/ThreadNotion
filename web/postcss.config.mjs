@@ -1,12 +1,9 @@
-{
-  "dependencies": {
-    "next": "16.0.10",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
-    "tailwindcss": "^4",
-    "@tailwindcss/postcss": "^4"
+/Users/alexsmith/Documents/ThreadNotion/web/postcss.config.mjs
+/** @type {import('postcss-load-config').Config} */
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
   },
-  "devDependencies": {
-    ...
-  }
-}
+};
+
+export default config;
