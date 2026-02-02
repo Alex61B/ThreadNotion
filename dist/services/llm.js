@@ -12,7 +12,7 @@ const client = new openai_1.default({
 exports.llm = {
     async chat(messages) {
         const completion = await client.chat.completions.create({
-            model: 'gpt-4.1-mini',
+            model: 'gpt-4o-mini',
             messages,
         });
         return completion.choices[0]?.message?.content ?? '';
@@ -40,7 +40,7 @@ Transcript:
 ${input.transcript}
 `;
         const completion = await client.chat.completions.create({
-            model: 'gpt-4.1-mini',
+            model: 'gpt-4o-mini',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
@@ -78,7 +78,7 @@ Return ONLY valid JSON with:
 }
 `;
         const completion = await client.chat.completions.create({
-            model: 'gpt-4.1-mini',
+            model: 'gpt-4o-mini',
             messages: [{ role: 'user', content: prompt }],
             response_format: { type: 'json_object' },
         });
