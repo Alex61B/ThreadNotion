@@ -1,0 +1,1 @@
+{"version":3,"file":"rollingScore.js","sourceRoot":"","sources":["../../src/domain/rollingScore.ts"],"names":[],"mappings":";;AAGA,kDAKC;AARD;;GAEG;AACH,SAAgB,mBAAmB,CAAC,UAAyB,EAAE,kBAA0B;IACvF,IAAI,UAAU,KAAK,IAAI,IAAI,UAAU,KAAK,SAAS,EAAE,CAAC;QACpD,OAAO,kBAAkB,CAAC;IAC5B,CAAC;IACD,OAAO,UAAU,GAAG,GAAG,GAAG,kBAAkB,GAAG,GAAG,CAAC;AACrD,CAAC"}

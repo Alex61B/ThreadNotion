@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
+import { EvaluationError } from '../errors/evaluationErrors';
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -28,6 +29,16 @@ type GenerateScriptArgs = {
 type GenerateScriptOutput = {
   persona: string;
   script: string[];
+};
+
+export type EvaluateSalesSkillsInput = {
+  transcript: string;
+  personaName: string;
+  metrics: {
+    questionCount: number;
+    avgMessageLength: number;
+    talkRatio: number;
+  };
 };
 
 export const llm = {
@@ -75,6 +86,84 @@ ${input.transcript}
 
     const raw = completion.choices[0]?.message?.content ?? '{}';
     return JSON.parse(raw) as JudgeOutput;
+  },
+
+  /**
+   * Structured evaluation for six canonical sales skills. Caller must validate with Zod.
+   */
+  async evaluateSalesSkills(input: EvaluateSalesSkillsInput): Promise<unknown> {
+    const systemPrompt = `You are an expert sales coach for fashion/apparel retail.
+Score the sales associate (the USER messages in the transcript) on six skills from 1 to 10.
+Be fair: use the full range. Consider both quality and the quantitative metrics provided.
+
+Return ONLY valid JSON matching this exact shape (no markdown):
+{
+  "skills": {
+    "discovery_questions": { "score": number, "reasoning": string },
+    "objection_handling": { "score": number, "reasoning": string },
+    "product_knowledge": { "score": number, "reasoning": string },
+    "closing": { "score": number, "reasoning": string },
+    "storytelling": { "score": number, "reasoning": string },
+    "empathy": { "score": number, "reasoning": string }
+  },
+  "topWeaknesses": [ string, string, string ],
+  "recommendedTips": [ string, ... ],
+  "coaching": {
+    "strengths": [ { "skill": string, "explanation": string } ],
+    "improvementAreas": [ { "skill": string, "explanation": string } ],
+    "keyMoments": [ {
+      "skill": string,
+      "customerMessage": string,
+      "userMessage": string,
+      "whyItMatters": string,
+      "suggestedApproach": string
+    } ],
+    "nextTimeFocus": [ string ],
+    "overallCoachingSummary": string
+  }
+}
+
+Rules:
+- Each score must be an integer from 1 to 10.
+- topWeaknesses must list exactly three skill keys from: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — ordered by priority (weakest first).
+- recommendedTips: 3–6 short, actionable tips; prioritize the weakest skills.
+- coaching.strengths: 1–6 items. What went well—be specific to behaviors visible in the transcript.
+- coaching.improvementAreas: 1–6 items. What to improve—tie to skills and concrete gaps (not generic negativity).
+- coaching.keyMoments: 2–6 items. Each moment must reference the NUMBERED transcript (e.g. turn [3] or a short quote from USER/ASSISTANT lines). Optional customerMessage/userMessage: short excerpts from those turns when helpful.
+- coaching.nextTimeFocus: 1–5 short bullets for the next practice session.
+- coaching.overallCoachingSummary: 2–5 sentences; supportive, specific, actionable—like a coach debrief.
+- Tone: professional, encouraging, never insulting.`;
+
+    const userPrompt = `Customer persona name: ${input.personaName}
+
+Quantitative signals (associate = user messages):
+- questionCount: ${input.metrics.questionCount}
+- avgMessageLength (chars): ${input.metrics.avgMessageLength.toFixed(1)}
+- talkRatio (associate chars / total chars): ${input.metrics.talkRatio.toFixed(3)}
+
+Numbered transcript (USER = sales associate, ASSISTANT = customer). Use [n] turn numbers when explaining key moments:
+${input.transcript}`;
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? '{}';
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch (err) {
+      console.error('[llm.evaluateSalesSkills] Malformed JSON from evaluator model');
+      throw new EvaluationError(
+        'Evaluator returned malformed JSON',
+        'EVALUATOR_PARSE',
+        err
+      );
+    }
   },
 
   async generateScript(args: GenerateScriptArgs): Promise<GenerateScriptOutput> {

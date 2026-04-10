@@ -1,0 +1,1 @@
+{"version":3,"file":"types.d.ts","sourceRoot":"","sources":["../../../src/domain/trainingAnalytics/types.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,UAAU,EAAE,MAAM,wBAAwB,CAAC;AAEzD,MAAM,MAAM,mBAAmB,GAAG;IAChC,cAAc,EAAE,MAAM,CAAC;IACvB,QAAQ,EAAE,MAAM,CAAC;IACjB,IAAI,EAAE,SAAS,GAAG,UAAU,GAAG,OAAO,CAAC;IACvC,MAAM,EAAE,MAAM,CAAC,UAAU,EAAE,MAAM,CAAC,CAAC;CACpC,CAAC"}

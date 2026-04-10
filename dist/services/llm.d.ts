@@ -27,9 +27,22 @@ type GenerateScriptOutput = {
     persona: string;
     script: string[];
 };
+export type EvaluateSalesSkillsInput = {
+    transcript: string;
+    personaName: string;
+    metrics: {
+        questionCount: number;
+        avgMessageLength: number;
+        talkRatio: number;
+    };
+};
 export declare const llm: {
     chat(messages: Msg[]): Promise<string>;
     judge(input: JudgeInput): Promise<JudgeOutput>;
+    /**
+     * Structured evaluation for six canonical sales skills. Caller must validate with Zod.
+     */
+    evaluateSalesSkills(input: EvaluateSalesSkillsInput): Promise<unknown>;
     generateScript(args: GenerateScriptArgs): Promise<GenerateScriptOutput>;
 };
 export {};

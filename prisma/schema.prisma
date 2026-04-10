@@ -1,18 +1,91 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider      = "prisma-client-js"
+  output        = "../generated/prisma"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum SalesSkill {
+  discovery_questions
+  objection_handling
+  product_knowledge
+  closing
+  storytelling
+  empathy
+}
+
+enum SimulationMode {
+  generic
+  adaptive
+  drill
+}
+
+enum TrendDirection {
+  improving
+  declining
+  stable
+}
+
+enum TeamMemberRole {
+  manager
+  rep
+}
+
+enum TrainingAssignmentType {
+  drill
+  adaptive
+}
+
+/// Global account type (not the same as TeamMemberRole, which is membership in a team).
+enum AccountRole {
+  MANAGER
+  SALES_REP
+}
+
+/// Phase 8: multi-user team training (opaque userId strings, same as Conversation.userId).
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  members       TeamMember[]
+  assignments   TrainingAssignment[]
+
+  @@index([ownerId])
+}
+
+model TeamMember {
+  id           String         @id @default(cuid())
+  teamId       String
+  userId       String
+  role         TeamMemberRole @default(rep)
+  displayName  String?
+  joinedAt     DateTime       @default(now())
+  team         Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model TrainingAssignment {
+  id              String                 @id @default(cuid())
+  teamId          String
+  assignedBy      String
+  targetUserId    String?
+  skill           SalesSkill
+  assignmentType  TrainingAssignmentType
+  active          Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  team            Team                   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([targetUserId])
+  @@index([teamId, active])
 }
 
 model Product {
@@ -24,44 +97,55 @@ model Product {
   attributes  Json?
   price       Float?
   currency    String?
-  scripts     Script[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  scripts     Script[]
 }
 
 model Persona {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  tone         String?
-  values       String?
-  instructions String
+  id            String         @id @default(cuid())
+  name          String         @unique
+  tone          String?
+  values        String?
+  instructions  String
+  createdAt     DateTime       @default(now())
   conversations Conversation[]
-  scripts      Script[]
-  createdAt    DateTime @default(now())
+  scripts       Script[]
 }
 
 model Conversation {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   personaId  String
-  persona    Persona  @relation(fields: [personaId], references: [id])
-  messages   Message[]
+  userId     String?     // Links conversation to a specific user (anonymous UUID from localStorage)
+  simulationMode SimulationMode @default(generic)
+  /// Persisted adaptive scenario plan (set once on adaptive create when weaknesses exist). Null for generic or legacy rows.
+  adaptiveScenarioPlan Json?
+  /// Persisted drill plan (focused practice). Null for non-drill rows.
+  drillPlan Json?
+  /// Phase 10: cooldown / dedupe for optional live coaching tips (JSON blob).
+  liveCoachingMeta Json?
+  createdAt  DateTime    @default(now())
+  persona    Persona     @relation(fields: [personaId], references: [id])
   evaluation Evaluation?
-  createdAt  DateTime @default(now())
+  messages   Message[]
+  skillScores SimulationSkillScore[]
+  evaluationSummary SimulationEvaluationSummary?
+
+  @@index([userId])
 }
 
 model Message {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  role           String   // "user" | "assistant" | "system"
+  role           String
   content        String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
 }
 
 model Evaluation {
-  id             String   @id @default(cuid())
-  conversationId String   @unique
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  id             String       @id @default(cuid())
+  conversationId String       @unique
   storytelling   Int
   emotional      Int
   persuasion     Int
@@ -69,17 +153,147 @@ model Evaluation {
   total          Int
   strengths      String
   tips           String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
 }
 
 model Script {
-  id         String   @id @default(cuid())
-  productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  personaId  String?
-  persona    Persona? @relation(fields: [personaId], references: [id])
-  tone       String?
-  content    Json
-  cacheKey   String   @unique
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  productId String
+  personaId String?
+  tone      String?
+  content   Json
+  cacheKey  String   @unique
+  createdAt DateTime @default(now())
+  persona   Persona? @relation(fields: [personaId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+/// Lightweight multi-session training focus (no curriculum engine).
+model UserTrainingFocus {
+  userId             String   @id
+  focusSkills        Json
+  sessionsRemaining  Int?
+  source             String   @default("user")
+  updatedAt          DateTime @updatedAt
+}
+
+model UserWeaknessProfile {
+  id               String         @id @default(cuid())
+  userId           String
+  skill            SalesSkill
+  currentScore     Float
+  trendDirection   TrendDirection
+  lastSimulationId String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([userId, skill])
+  @@index([userId])
+}
+
+model SimulationSkillScore {
+  id             String       @id @default(cuid())
+  userId         String?
+  conversationId String
+  skill          SalesSkill
+  score          Int
+  reasoning      String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, skill])
+  @@index([userId])
+}
+
+model SimulationEvaluationSummary {
+  id                 String       @id @default(cuid())
+  userId             String?
+  conversationId     String       @unique
+  questionCount      Int
+  avgMessageLength   Float
+  talkRatio          Float
+  weaknesses         Json
+  recommendedTips    Json
+  rawEvaluatorOutput Json
+  createdAt          DateTime     @default(now())
+  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// --- Auth.js (NextAuth) + ThreadNotion account metadata ---
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          AccountRole @default(SALES_REP)
+  accounts      Account[]
+  sessions      Session[]
+  anonymousClaims AnonymousIdentityClaim[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Pending signup: role applied in Auth.js createUser event when email verifies.
+model SignUpIntent {
+  id         String      @id @default(cuid())
+  email      String
+  role       AccountRole
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([email])
+}
+
+/// Marks anonymous localStorage UUID as merged into authenticated User.id.
+model AnonymousIdentityClaim {
+  anonymousUserId String   @id
+  authUserId      String
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+
+  @@index([authUserId])
 }
