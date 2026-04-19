@@ -743,7 +743,10 @@ const ChatReq = zod_1.z
     userId: zod_1.z.string().optional(),
     message: zod_1.z.string().min(1),
     mode: zod_1.z.enum(['roleplay', 'assistant']).optional(),
-    simulationMode: zod_1.z.enum(['generic', 'adaptive', 'drill']).optional().default('generic'),
+    simulationMode: zod_1.z
+        .enum(['generic', 'adaptive', 'drill', 'mixed_practice'])
+        .optional()
+        .default('generic'),
     primaryDrillSkill: coaching_1.SalesSkillSchema.optional(),
     secondaryDrillSkill: coaching_1.SalesSkillSchema.optional(),
     variantSeed: zod_1.z.string().optional(),
@@ -761,7 +764,13 @@ const ChatReq = zod_1.z
 app.post('/chat', asyncHandler(async (req, res) => {
     const { conversationId, personaId, productId, userId, message, mode, simulationMode, primaryDrillSkill, secondaryDrillSkill, variantSeed, liveCoachingEnabled, } = ChatReq.parse(req.body);
     const chatMode = mode ?? 'roleplay';
-    const simMode = simulationMode === 'adaptive' ? 'adaptive' : simulationMode === 'drill' ? 'drill' : 'generic';
+    const simMode = simulationMode === 'adaptive'
+        ? 'adaptive'
+        : simulationMode === 'drill'
+            ? 'drill'
+            : simulationMode === 'mixed_practice'
+                ? 'mixed_practice'
+                : 'generic';
     const persona = await db_1.prisma.persona.findUnique({ where: { id: personaId } });
     if (!persona)
         return res.status(404).json({ error: 'persona not found' });

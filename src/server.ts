@@ -933,7 +933,10 @@ const ChatReq = z
     userId: z.string().optional(),
     message: z.string().min(1),
     mode: z.enum(['roleplay', 'assistant']).optional(),
-    simulationMode: z.enum(['generic', 'adaptive', 'drill']).optional().default('generic'),
+    simulationMode: z
+      .enum(['generic', 'adaptive', 'drill', 'mixed_practice'])
+      .optional()
+      .default('generic'),
     primaryDrillSkill: SalesSkillSchema.optional(),
     secondaryDrillSkill: SalesSkillSchema.optional(),
     variantSeed: z.string().optional(),
@@ -967,7 +970,13 @@ app.post(
     } = ChatReq.parse(req.body);
     const chatMode = mode ?? 'roleplay';
     const simMode =
-      simulationMode === 'adaptive' ? 'adaptive' : simulationMode === 'drill' ? 'drill' : 'generic';
+      simulationMode === 'adaptive'
+        ? 'adaptive'
+        : simulationMode === 'drill'
+          ? 'drill'
+          : simulationMode === 'mixed_practice'
+            ? 'mixed_practice'
+            : 'generic';
 
     const persona = await prisma.persona.findUnique({ where: { id: personaId } });
     if (!persona) return res.status(404).json({ error: 'persona not found' });
@@ -981,7 +990,7 @@ app.post(
     let isContinue = false;
     let convo: {
       id: string;
-      simulationMode: 'generic' | 'adaptive' | 'drill';
+      simulationMode: 'generic' | 'adaptive' | 'drill' | 'mixed_practice';
       adaptiveScenarioPlan: unknown | null;
       drillPlan: unknown | null;
       messages: { role: string; content: string; createdAt: Date }[];
