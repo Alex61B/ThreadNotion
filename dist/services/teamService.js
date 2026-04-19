@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TeamAccessError = void 0;
+exports.UserMultiTeamNotAllowedError = exports.TeamSeatLimitError = exports.TeamAccessError = void 0;
 exports.createTeam = createTeam;
 exports.listTeamsForUser = listTeamsForUser;
 exports.getTeam = getTeam;
@@ -11,6 +11,7 @@ exports.assertTeamMember = assertTeamMember;
 exports.addTeamMember = addTeamMember;
 exports.ensureMemberOfTeam = ensureMemberOfTeam;
 const db_1 = require("../db");
+const teamEntitlements_1 = require("../billing/teamEntitlements");
 class TeamAccessError extends Error {
     constructor(message, statusCode) {
         super(message);
@@ -19,6 +20,20 @@ class TeamAccessError extends Error {
     }
 }
 exports.TeamAccessError = TeamAccessError;
+class TeamSeatLimitError extends TeamAccessError {
+    constructor() {
+        super('Team seat limit reached', 403);
+        this.name = 'TeamSeatLimitError';
+    }
+}
+exports.TeamSeatLimitError = TeamSeatLimitError;
+class UserMultiTeamNotAllowedError extends TeamAccessError {
+    constructor() {
+        super('User is already a member of another team', 409);
+        this.name = 'UserMultiTeamNotAllowedError';
+    }
+}
+exports.UserMultiTeamNotAllowedError = UserMultiTeamNotAllowedError;
 async function createTeam(name, ownerId) {
     const team = await db_1.prisma.team.create({
         data: {
@@ -86,6 +101,27 @@ async function assertTeamMember(teamId, userId) {
     }
 }
 async function addTeamMember(args) {
+    // MVP constraint: each user may belong to at most one team.
+    const existingMembership = await db_1.prisma.teamMember.findFirst({
+        where: { userId: args.memberUserId, NOT: { teamId: args.teamId } },
+    });
+    if (existingMembership) {
+        throw new UserMultiTeamNotAllowedError();
+    }
+    // Seat enforcement (MVP): if team has an active paid TEAM subscription, block joins at seat limit.
+    const billing = await db_1.prisma.billingAccount.findUnique({ where: { teamId: args.teamId } });
+    if (billing) {
+        const sub = await db_1.prisma.subscription.findUnique({ where: { billingAccountId: billing.id } });
+        if (sub && (sub.status === 'ACTIVE' || sub.status === 'PAST_DUE') && sub.planType === 'TEAM') {
+            const maxSeats = (0, teamEntitlements_1.maxSeatsFromBundle)(sub.seatBundle);
+            if (maxSeats > 0) {
+                const activeCount = await db_1.prisma.teamMember.count({ where: { teamId: args.teamId } });
+                if (activeCount >= maxSeats) {
+                    throw new TeamSeatLimitError();
+                }
+            }
+        }
+    }
     return db_1.prisma.teamMember.create({
         data: {
             teamId: args.teamId,

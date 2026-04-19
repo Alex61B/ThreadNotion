@@ -9,7 +9,16 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const zod_1 = require("zod");
 const db_1 = require("./db");
+const checkoutSessions_1 = require("./billing/checkoutSessions");
+const webhook_1 = require("./billing/webhook");
+const webhookHandler_1 = require("./billing/webhookHandler");
+const sessionAuth_1 = require("./auth/sessionAuth");
+const teamBilling_1 = require("./billing/teamBilling");
+const graceSweeper_1 = require("./billing/graceSweeper");
+const cancellation_1 = require("./billing/cancellation");
 const llm_1 = require("./services/llm");
+const quotaGuard_1 = require("./usage/quotaGuard");
+const simulationCap_1 = require("./usage/simulationCap");
 const simulationEvaluationService_1 = require("./services/simulationEvaluationService");
 const weaknessProfileService_1 = require("./services/weaknessProfileService");
 const adaptiveScenarioPlanService_1 = require("./services/adaptiveScenarioPlanService");
@@ -41,7 +50,23 @@ try {
 catch {
     // no-op
 }
-// Middleware
+// ===========================================
+// STRIPE WEBHOOK (raw body required)
+// ===========================================
+app.post('/api/stripe/webhook', express_1.default.raw({ type: 'application/json' }), (req, res) => {
+    try {
+        const event = (0, webhook_1.constructStripeEvent)(req);
+        (0, webhookHandler_1.handleStripeEvent)(event).catch((e) => {
+            console.error('[stripe.webhook] handler error', e);
+        });
+        return res.json({ received: true });
+    }
+    catch (err) {
+        console.error('[stripe.webhook] signature verification failed', err?.message ?? err);
+        return res.status(400).json({ error: 'Invalid webhook signature' });
+    }
+});
+// Middleware (keep after webhook so raw body is preserved)
 app.use(express_1.default.json());
 app.use((0, cors_1.default)({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -51,6 +76,179 @@ app.use((0, cors_1.default)({
 // UTILITY
 // ===========================================
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+// ===========================================
+// BILLING (MVP scaffolding)
+// ===========================================
+app.post('/api/billing/checkout-session', asyncHandler(async (req, res) => {
+    const body = checkoutSessions_1.CreateCheckoutSessionBodySchema.safeParse(req.body);
+    if (!body.success) {
+        return res.status(400).json({ error: 'Invalid body', details: body.error.flatten() });
+    }
+    const out = await (0, checkoutSessions_1.createCheckoutSession)(body.data);
+    res.json({ ok: true, checkoutUrl: out.url });
+}));
+app.post('/api/billing/portal-session', asyncHandler(async (req, res) => {
+    const body = checkoutSessions_1.CreatePortalSessionBodySchema.safeParse(req.body);
+    if (!body.success) {
+        return res.status(400).json({ error: 'Invalid body', details: body.error.flatten() });
+    }
+    const out = await (0, checkoutSessions_1.createPortalSession)(body.data);
+    res.json({ ok: true, portalUrl: out.url });
+}));
+app.post('/api/billing/cancel', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const userId = req.authUserId;
+    // Cancellation is session-scoped; Stripe handles billing-period rules.
+    await (0, cancellation_1.cancelUserSubscriptionsOnDelete)({ userId });
+    res.json({ ok: true });
+}));
+app.get('/api/billing/invoices', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const userId = req.authUserId;
+    const acct = await db_1.prisma.billingAccount.findUnique({ where: { userId } });
+    if (!acct)
+        return res.json({ ok: true, invoices: [] });
+    const invoices = await db_1.prisma.invoiceRecord.findMany({
+        where: { billingAccountId: acct.id },
+        orderBy: { issuedAt: 'desc' },
+        take: 50,
+    });
+    res.json({ ok: true, invoices });
+}));
+// ===========================================
+// TEAM BILLING (Phase 3 MVP)
+// ===========================================
+app.post('/api/team/:teamId/billing/checkout-session', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const teamId = req.params.teamId;
+    const actingUserId = req.authUserId;
+    try {
+        await (0, teamService_1.assertTeamManagerOrOwner)(teamId, actingUserId);
+    }
+    catch (e) {
+        if (handleTeamError(res, e))
+            return;
+        throw e;
+    }
+    const body = zod_1.z.object({ seatBundle: zod_1.z.union([zod_1.z.literal(10), zod_1.z.literal(25), zod_1.z.literal(50)]) }).safeParse(req.body);
+    if (!body.success)
+        return res.status(400).json({ error: 'Invalid body', details: body.error.flatten() });
+    const out = await (0, teamBilling_1.createTeamCheckoutSession)({ actingUserId, teamId, seatBundle: body.data.seatBundle });
+    res.json({ ok: true, checkoutUrl: out.url });
+}));
+app.post('/api/team/:teamId/billing/portal-session', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const teamId = req.params.teamId;
+    const actingUserId = req.authUserId;
+    try {
+        await (0, teamService_1.assertTeamManagerOrOwner)(teamId, actingUserId);
+    }
+    catch (e) {
+        if (handleTeamError(res, e))
+            return;
+        throw e;
+    }
+    const out = await (0, teamBilling_1.createTeamPortalSession)({ teamId });
+    res.json({ ok: true, portalUrl: out.url });
+}));
+app.post('/api/team/:teamId/billing/cancel', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const teamId = req.params.teamId;
+    const actingUserId = req.authUserId;
+    try {
+        await (0, teamService_1.assertTeamManagerOrOwner)(teamId, actingUserId);
+    }
+    catch (e) {
+        if (handleTeamError(res, e))
+            return;
+        throw e;
+    }
+    await (0, cancellation_1.cancelTeamSubscriptionsOnDelete)({ teamId });
+    res.json({ ok: true });
+}));
+app.get('/api/team/:teamId/billing/status', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const teamId = req.params.teamId;
+    const actingUserId = req.authUserId;
+    try {
+        await (0, teamService_1.assertTeamManagerOrOwner)(teamId, actingUserId);
+    }
+    catch (e) {
+        if (handleTeamError(res, e))
+            return;
+        throw e;
+    }
+    const ent = await db_1.prisma.entitlement.findUnique({
+        where: { subjectType_subjectId: { subjectType: 'TEAM', subjectId: teamId } },
+    });
+    const planType = ent?.planType ?? 'FREE';
+    const dailyLimit = ent?.dailyTokenLimit ?? 0;
+    const maxSeats = ent?.maxSeats ?? 0;
+    const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+    const usageRow = await db_1.prisma.tokenUsageDaily.findUnique({
+        where: { scopeType_scopeId_date: { scopeType: 'TEAM', scopeId: teamId, date: today } },
+    });
+    const tokensUsedToday = usageRow ? Number(usageRow.tokensUsed) : 0;
+    const activeMembers = await db_1.prisma.teamMember.count({ where: { teamId } });
+    res.json({
+        ok: true,
+        plan: {
+            planType,
+            maxSeats,
+            dailyTokenLimit: dailyLimit,
+        },
+        usage: {
+            activeMembers,
+            seatsRemaining: maxSeats > 0 ? Math.max(0, maxSeats - activeMembers) : null,
+            tokensUsedToday,
+            tokensRemainingToday: dailyLimit > 0 ? Math.max(0, dailyLimit - tokensUsedToday) : null,
+        },
+    });
+}));
+app.get('/api/team/:teamId/billing/invoices', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const teamId = req.params.teamId;
+    const actingUserId = req.authUserId;
+    try {
+        await (0, teamService_1.assertTeamManagerOrOwner)(teamId, actingUserId);
+    }
+    catch (e) {
+        if (handleTeamError(res, e))
+            return;
+        throw e;
+    }
+    const acct = await db_1.prisma.billingAccount.findUnique({ where: { teamId } });
+    if (!acct)
+        return res.json({ ok: true, invoices: [] });
+    const invoices = await db_1.prisma.invoiceRecord.findMany({
+        where: { billingAccountId: acct.id },
+        orderBy: { issuedAt: 'desc' },
+        take: 50,
+    });
+    res.json({ ok: true, invoices });
+}));
+app.get('/api/billing/status', (0, sessionAuth_1.requireAuthSession)(), asyncHandler(async (req, res) => {
+    const userId = req.authUserId;
+    // Entitlement snapshot (single source of truth for enforcement)
+    const ent = await db_1.prisma.entitlement.findUnique({
+        where: { subjectType_subjectId: { subjectType: 'USER', subjectId: userId } },
+    });
+    const planType = ent?.planType ?? 'FREE';
+    const dailyLimit = ent?.dailyTokenLimit ?? 0;
+    const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+    const usageRow = await db_1.prisma.tokenUsageDaily.findUnique({
+        where: { scopeType_scopeId_date: { scopeType: 'USER', scopeId: userId, date: today } },
+    });
+    const tokensUsedToday = usageRow ? Number(usageRow.tokensUsed) : 0;
+    const simulationsUsed = await db_1.prisma.conversation.count({ where: { userId } });
+    res.json({
+        ok: true,
+        plan: {
+            planType,
+            freeSimulationLimit: ent?.freeSimulationLimit ?? 5,
+            dailyTokenLimit: dailyLimit,
+        },
+        usage: {
+            simulationsUsed,
+            simulationsRemaining: planType === 'FREE' ? Math.max(0, 5 - simulationsUsed) : null,
+            tokensUsedToday,
+            tokensRemainingToday: dailyLimit > 0 ? Math.max(0, dailyLimit - tokensUsedToday) : null,
+        },
+    });
+}));
 // ===========================================
 // HEALTH & BASIC ROUTES
 // ===========================================
@@ -164,6 +362,10 @@ app.get('/user-training-analytics', asyncHandler(async (req, res) => {
 }));
 function handleTeamError(res, e) {
     if (e instanceof teamService_1.TeamAccessError) {
+        if (e instanceof teamService_1.TeamSeatLimitError) {
+            res.status(409).json({ error: 'TEAM_SEAT_LIMIT_REACHED' });
+            return true;
+        }
         res.status(e.statusCode).json({ error: e.message });
         return true;
     }
@@ -246,6 +448,8 @@ app.post('/team/:teamId/members', asyncHandler(async (req, res) => {
         });
     }
     catch (err) {
+        if (handleTeamError(res, err))
+            return;
         if (err?.code === 'P2002') {
             return res.status(409).json({ error: 'User is already a member of this team' });
         }
@@ -578,6 +782,14 @@ app.post('/chat', asyncHandler(async (req, res) => {
             isContinue = true;
         }
         else {
+            const gate = await (0, quotaGuard_1.assertCanCreateNewSimulation)(userId ? { userId } : {});
+            if (!gate.ok)
+                return res.status(402).json(gate);
+            if (userId) {
+                const cap = await (0, simulationCap_1.assertAndIncrementSimulationCount)({ userId });
+                if (!cap.ok)
+                    return res.status(402).json(cap);
+            }
             convo = await db_1.prisma.conversation.create({
                 data: { personaId, userId: userId ?? null, simulationMode: simMode },
                 include: { messages: { orderBy: { createdAt: 'asc' } } },
@@ -586,6 +798,14 @@ app.post('/chat', asyncHandler(async (req, res) => {
         }
     }
     else {
+        const gate = await (0, quotaGuard_1.assertCanCreateNewSimulation)(userId ? { userId } : {});
+        if (!gate.ok)
+            return res.status(402).json(gate);
+        if (userId) {
+            const cap = await (0, simulationCap_1.assertAndIncrementSimulationCount)({ userId });
+            if (!cap.ok)
+                return res.status(402).json(cap);
+        }
         convo = await db_1.prisma.conversation.create({
             data: { personaId, userId: userId ?? null, simulationMode: simMode },
             include: { messages: { orderBy: { createdAt: 'asc' } } },
@@ -743,7 +963,13 @@ Keep advice practical and specific to clothing/fashion sales.`;
         })),
         { role: 'user', content: message },
     ];
-    const reply = await llm_1.llm.chat(history);
+    const tokenGate = await (0, quotaGuard_1.assertCanConsumeTokens)(userId ? { userId, estimatedTokens: 0 } : { estimatedTokens: 0 });
+    if (!tokenGate.ok)
+        return res.status(402).json(tokenGate);
+    const { content: reply, usage } = await llm_1.llm.chatWithUsage(history);
+    if (userId) {
+        await (0, quotaGuard_1.recordTokenUsage)({ userId, tokens: usage.totalTokens });
+    }
     await db_1.prisma.message.createMany({
         data: [
             { conversationId: convo.id, role: 'user', content: message },
@@ -852,6 +1078,10 @@ const GenReq = zod_1.z.object({
 });
 app.post('/generate-script', asyncHandler(async (req, res) => {
     const { productId, personaId, tone } = GenReq.parse(req.body);
+    const userId = req.query.userId ?? undefined;
+    const tokenGate = await (0, quotaGuard_1.assertCanConsumeTokens)(userId ? { userId, estimatedTokens: 0 } : { estimatedTokens: 0 });
+    if (!tokenGate.ok)
+        return res.status(402).json(tokenGate);
     const product = await db_1.prisma.product.findUnique({ where: { id: productId } });
     if (!product)
         return res.status(404).json({ error: 'product not found' });
@@ -911,13 +1141,16 @@ Close
 [2-3 ways to guide toward purchase, suggest add-ons]
 
 Write naturally, as a real associate would speak. Focus on fashion-specific language (fit, style, versatility, quality, comfort).`;
-    const scriptResponse = await llm_1.llm.chat([
+    const { content: scriptResponse, usage } = await llm_1.llm.chatWithUsage([
         {
             role: 'system',
             content: 'You are a fashion retail sales training expert. Generate practical, conversational scripts for clothing store associates.',
         },
         { role: 'user', content: scriptPrompt },
     ]);
+    if (userId) {
+        await (0, quotaGuard_1.recordTokenUsage)({ userId, tokens: usage.totalTokens });
+    }
     const scriptContent = {
         persona: persona?.name || 'General',
         script: scriptResponse,
@@ -985,5 +1218,9 @@ if (!process.env.VITEST) {
     app.listen(PORT, () => {
         console.log(`🚀 ThreadNotion API on port ${PORT}`);
     });
+    // Phase 4: deterministic grace expiry sweeper (every 15 minutes).
+    setInterval(() => {
+        (0, graceSweeper_1.sweepExpiredGracePeriods)().catch((e) => console.error('[graceSweeper] failed', e));
+    }, 15 * 60 * 1000);
 }
 //# sourceMappingURL=server.js.map

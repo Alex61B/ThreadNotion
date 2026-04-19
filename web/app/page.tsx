@@ -1,7 +1,31 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
+import Link from 'next/link';
+
+// Web Speech API — not in all TS DOM lib versions
+declare global {
+  interface SpeechRecognitionEvent extends Event {
+    readonly results: SpeechRecognitionResultList;
+  }
+  interface SpeechRecognition extends EventTarget {
+    lang: string;
+    interimResults: boolean;
+    continuous: boolean;
+    maxAlternatives: number;
+    onresult: ((e: SpeechRecognitionEvent) => void) | null;
+    onerror: ((e: Event) => void) | null;
+    onend: ((e: Event) => void) | null;
+    start(): void;
+    stop(): void;
+  }
+  const SpeechRecognition: { new (): SpeechRecognition };
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition | undefined;
+    webkitSpeechRecognition: typeof SpeechRecognition | undefined;
+  }
+}
 
 // =============================================================================
 // TYPES
@@ -979,6 +1003,9 @@ export default function HomePage() {
   const [draft, setDraft] = useState<string>('');
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [sending, setSending] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   /** First-reply echo from POST /chat when adaptive plan was created (before list refresh). */
   const [adaptivePlanFromChat, setAdaptivePlanFromChat] = useState<AdaptiveScenarioPlanPayload | null>(
     null
@@ -1081,8 +1108,8 @@ export default function HomePage() {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const res = await fetch('http://localhost:3001/health', {
+      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${base}/health`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -1097,14 +1124,15 @@ export default function HomePage() {
   const fetchPersonas = useCallback(async () => {
     setLoadingPersonas(true);
     try {
-      const res = await fetch('/api/personas');
-      if (!res.ok) throw new Error('Failed to fetch personas');
+      const res = await fetch('/api/personas', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`Failed to fetch personas (${res.status})`);
       const data = (await res.json()) as PersonasResponse;
       if (data?.ok && Array.isArray(data.personas)) {
         setPersonas(data.personas);
         if (data.personas.length > 0) {
-          if (!personaId) setPersonaId(data.personas[0].id);
-          if (!scriptPersonaId) setScriptPersonaId(data.personas[0].id);
+          const first = data.personas[0]!.id;
+          setPersonaId((prev) => prev || first);
+          setScriptPersonaId((prev) => prev || first);
         }
       }
     } catch (e) {
@@ -1113,19 +1141,20 @@ export default function HomePage() {
     } finally {
       setLoadingPersonas(false);
     }
-  }, [personaId, scriptPersonaId]);
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch('/api/products', { credentials: 'same-origin' });
       if (!res.ok) throw new Error('Failed to fetch products');
       const data = (await res.json()) as ProductsResponse;
       if (data?.ok && Array.isArray(data.products)) {
         setProducts(data.products);
         if (data.products.length > 0) {
-          if (!productId) setProductId(data.products[0].id);
-          if (!scriptProductId) setScriptProductId(data.products[0].id);
+          const first = data.products[0]!.id;
+          setProductId((prev) => prev || first);
+          setScriptProductId((prev) => prev || first);
         }
       }
     } catch (e) {
@@ -1134,7 +1163,7 @@ export default function HomePage() {
     } finally {
       setLoadingProducts(false);
     }
-  }, [productId, scriptProductId]);
+  }, []);
 
   // UPDATED: Now fetches conversations filtered by userId
   const fetchConversations = useCallback(async () => {
@@ -1400,6 +1429,13 @@ export default function HomePage() {
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
+
   function persistLiveCoachToggle(on: boolean) {
     setLiveCoachTipsEnabled(on);
     try {
@@ -1424,6 +1460,49 @@ export default function HomePage() {
     setDrillPlanFromChat(null);
     setLiveCoachTip(null);
     setLiveCoachTipDismissed(false);
+    stopRecording();
+    window.speechSynthesis?.cancel();
+    setSpeakingIdx(null);
+  }
+
+  function startRecording() {
+    const API = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!API) return;
+    const recognition = new API();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      setDraft(e.results[0]?.[0]?.transcript ?? '');
+      setIsRecording(false);
+      recognitionRef.current = null;
+    };
+    recognition.onerror = () => { setIsRecording(false); recognitionRef.current = null; };
+    recognition.onend = () => { setIsRecording(false); recognitionRef.current = null; };
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+  }
+
+  function stopRecording() {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setIsRecording(false);
+  }
+
+  function toggleSpeak(idx: number, content: string) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(content);
+    utterance.onend = () => setSpeakingIdx(null);
+    utterance.onerror = () => setSpeakingIdx(null);
+    setSpeakingIdx(idx);
+    window.speechSynthesis.speak(utterance);
   }
 
   function trainWeaknesses() {
@@ -1593,6 +1672,9 @@ export default function HomePage() {
     setProgressConversationId(null);
     setLiveCoachTip(null);
     setLiveCoachTipDismissed(false);
+    stopRecording();
+    window.speechSynthesis?.cancel();
+    setSpeakingIdx(null);
     if (conv.coachingEvaluation) {
       setCoachingEvaluation({
         conversationId: conv.id,
@@ -1888,6 +1970,12 @@ export default function HomePage() {
                   </p>
                 </div>
               ) : null}
+              <Link
+                href="/settings/billing"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white border border-zinc-700 hover:bg-zinc-800"
+              >
+                Settings
+              </Link>
               <button
                 type="button"
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-white border border-zinc-700 hover:bg-zinc-800"
@@ -2308,6 +2396,30 @@ export default function HomePage() {
                             {m.role === 'user' ? 'You (Sales Associate)' : selectedPersona?.name || 'Customer'}
                           </div>
                           <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+                          {m.role === 'assistant' && (
+                            <div className="mt-1.5 flex justify-end">
+                              <button
+                                type="button"
+                                title={speakingIdx === idx ? 'Stop audio' : 'Play as audio'}
+                                onClick={() => toggleSpeak(idx, m.content)}
+                                className={`rounded p-1 transition-all ${
+                                  speakingIdx === idx
+                                    ? 'text-blue-400 hover:text-blue-300'
+                                    : 'text-zinc-500 hover:text-zinc-300'
+                                }`}
+                              >
+                                {speakingIdx === idx ? (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                                  </svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
@@ -2323,7 +2435,7 @@ export default function HomePage() {
 
                 {/* Input */}
                 <div className="border-t border-zinc-700 p-4">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     <input
                       className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
                       value={draft}
@@ -2337,6 +2449,25 @@ export default function HomePage() {
                       }}
                       disabled={sending}
                     />
+                    {typeof window !== 'undefined' &&
+                      (window.SpeechRecognition ?? window.webkitSpeechRecognition) && (
+                        <button
+                          type="button"
+                          title={isRecording ? 'Stop recording' : 'Speak your response'}
+                          disabled={sending || (chatMode === 'roleplay' && !personaId)}
+                          onClick={isRecording ? stopRecording : startRecording}
+                          className={`flex-shrink-0 rounded-lg p-2.5 transition-all disabled:opacity-50 ${
+                            isRecording
+                              ? 'bg-red-600 text-white animate-pulse'
+                              : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white'
+                          }`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
+                          </svg>
+                        </button>
+                      )}
                     <button
                       className="px-6 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-all flex items-center gap-2"
                       style={{ backgroundColor: NAVY_ACCENT }}

@@ -4,6 +4,10 @@ import { buildDrillScenarioPlan } from './services/drillScenarioPlanService';
 
 const hoisted = vi.hoisted(() => ({
   llmChat: vi.fn().mockResolvedValue('Customer reply'),
+  llmChatWithUsage: vi.fn().mockResolvedValue({
+    content: 'Customer reply',
+    usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+  }),
   getTopWeaknessesForUser: vi.fn(),
   personaFindUnique: vi.fn(),
   productFindUnique: vi.fn(),
@@ -11,11 +15,15 @@ const hoisted = vi.hoisted(() => ({
   convCreate: vi.fn(),
   convUpdate: vi.fn(),
   messageCreateMany: vi.fn(),
+  simUsageUpsert: vi.fn(),
+  simUsageUpdate: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock('./services/llm', () => ({
   llm: {
     chat: hoisted.llmChat,
+    chatWithUsage: hoisted.llmChatWithUsage,
     evaluateSalesSkills: vi.fn(),
     judge: vi.fn(),
     generateScript: vi.fn(),
@@ -27,8 +35,8 @@ vi.mock('./services/weaknessProfileService', () => ({
   listWeaknessProfilesForUser: vi.fn(),
 }));
 
-vi.mock('./db', () => ({
-  prisma: {
+vi.mock('./db', () => {
+  const prismaMock: any = {
     persona: { findUnique: hoisted.personaFindUnique },
     product: { findUnique: hoisted.productFindUnique },
     conversation: {
@@ -37,8 +45,12 @@ vi.mock('./db', () => ({
       update: hoisted.convUpdate,
     },
     message: { createMany: hoisted.messageCreateMany },
-  },
-}));
+    userSimulationUsage: { upsert: hoisted.simUsageUpsert, update: hoisted.simUsageUpdate },
+    $queryRaw: hoisted.queryRaw,
+    $transaction: async (fn: any) => fn(prismaMock),
+  };
+  return { prisma: prismaMock };
+});
 
 import { app } from './server';
 
@@ -51,6 +63,7 @@ const basePersona = {
 
 function resetMocks() {
   hoisted.llmChat.mockClear();
+  hoisted.llmChatWithUsage.mockClear();
   hoisted.getTopWeaknessesForUser.mockReset();
   hoisted.convFindUnique.mockReset();
   hoisted.convCreate.mockReset();
@@ -58,6 +71,9 @@ function resetMocks() {
   hoisted.personaFindUnique.mockResolvedValue(basePersona);
   hoisted.productFindUnique.mockResolvedValue(null);
   hoisted.messageCreateMany.mockResolvedValue({ count: 2 });
+  hoisted.simUsageUpsert.mockResolvedValue({});
+  hoisted.simUsageUpdate.mockResolvedValue({});
+  hoisted.queryRaw.mockResolvedValue([{ userId: 'u1', uniqueSimulationsCount: 0 }]);
 }
 
 describe('POST /chat drill mode', () => {
@@ -104,7 +120,7 @@ describe('POST /chat drill mode', () => {
     expect(hoisted.convUpdate).toHaveBeenCalled();
     expect(hoisted.getTopWeaknessesForUser).not.toHaveBeenCalled();
 
-    const history = hoisted.llmChat.mock.calls[0]?.[0] as { role: string; content: string }[];
+    const history = hoisted.llmChatWithUsage.mock.calls[0]?.[0] as { role: string; content: string }[];
     const system = history?.[0]?.content ?? '';
     expect(system).toContain('FOCUSED DRILL');
     expect(system).toContain('focused practice drill');
@@ -141,7 +157,7 @@ describe('POST /chat drill mode', () => {
     expect(res.status).toBe(200);
     expect(hoisted.getTopWeaknessesForUser).not.toHaveBeenCalled();
     expect(hoisted.convUpdate).not.toHaveBeenCalled();
-    const history = hoisted.llmChat.mock.calls[0]?.[0] as { role: string; content: string }[];
+    const history = hoisted.llmChatWithUsage.mock.calls[0]?.[0] as { role: string; content: string }[];
     expect(history?.[0]?.content ?? '').toContain('FOCUSED DRILL');
   });
 });

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/typecheck-web.sh",
+        "timeout": 120
+      },
+      {
+        "command": ".cursor/hooks/prisma-validate.sh",
+        "timeout": 60
+      },
+      {
+        "command": ".cursor/hooks/typecheck-backend.sh",
+        "timeout": 90
+      }
+    ]
+  }
+}

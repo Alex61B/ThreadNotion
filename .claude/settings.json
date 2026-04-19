@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "defaultMode": "plan"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typecheck-web.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/prisma-validate.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typecheck-backend.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "MSG=$(jq -r '.message // \"Task complete\"' 2>/dev/null || echo \"Task complete\"); osascript -e \"display notification \\\"$MSG\\\" with title \\\"Claude Code\\\"\" 2>/dev/null; afplay /System/Library/Sounds/Glass.aiff 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

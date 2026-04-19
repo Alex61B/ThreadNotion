@@ -12,6 +12,7 @@ vi.mock('./services/teamService', async (importOriginal) => {
     listTeamMembers: vi.fn(),
     addTeamMember: vi.fn(),
     ensureMemberOfTeam: vi.fn(),
+    isTeamManagerOrOwner: vi.fn(),
   };
 });
 
@@ -238,6 +239,17 @@ describe('Phase 8 team routes', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.member.userId).toBe('newRep');
     expect(res.body.member.joinedAt).toBe(joined.toISOString());
+  });
+
+  it('POST /team/:teamId/members returns 409 when seat limit reached', async () => {
+    mockAddMember.mockRejectedValueOnce(new (teamService as any).TeamSeatLimitError());
+
+    const res = await request(app)
+      .post('/team/t1/members')
+      .query({ userId: 'mgr' })
+      .send({ memberUserId: 'newRep' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('TEAM_SEAT_LIMIT_REACHED');
   });
 
   it('POST /team/:teamId/members returns 409 when member already exists', async () => {

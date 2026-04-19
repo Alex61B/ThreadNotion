@@ -18,6 +18,21 @@ exports.llm = {
         });
         return completion.choices[0]?.message?.content ?? '';
     },
+    async chatWithUsage(messages) {
+        const completion = await client.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages,
+        });
+        const usage = completion.usage;
+        return {
+            content: completion.choices[0]?.message?.content ?? '',
+            usage: {
+                promptTokens: usage?.prompt_tokens ?? 0,
+                completionTokens: usage?.completion_tokens ?? 0,
+                totalTokens: usage?.total_tokens ?? 0,
+            },
+        };
+    },
     async judge(input) {
         const systemPrompt = `
 You are a sales coach. Score the associate on:

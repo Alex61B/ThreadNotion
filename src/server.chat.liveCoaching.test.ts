@@ -3,6 +3,10 @@ import request from 'supertest';
 
 const hoisted = vi.hoisted(() => ({
   llmChat: vi.fn().mockResolvedValue('Customer reply'),
+  llmChatWithUsage: vi.fn().mockResolvedValue({
+    content: 'Customer reply',
+    usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+  }),
   getTopWeaknessesForUser: vi.fn(),
   personaFindUnique: vi.fn(),
   productFindUnique: vi.fn(),
@@ -11,11 +15,15 @@ const hoisted = vi.hoisted(() => ({
   convUpdate: vi.fn(),
   messageCreateMany: vi.fn(),
   getLiveCoachingAfterChatTurn: vi.fn(),
+  simUsageUpsert: vi.fn(),
+  simUsageUpdate: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock('./services/llm', () => ({
   llm: {
     chat: hoisted.llmChat,
+    chatWithUsage: hoisted.llmChatWithUsage,
     evaluateSalesSkills: vi.fn(),
     judge: vi.fn(),
     generateScript: vi.fn(),
@@ -31,8 +39,8 @@ vi.mock('./services/liveCoachingService', () => ({
   getLiveCoachingAfterChatTurn: hoisted.getLiveCoachingAfterChatTurn,
 }));
 
-vi.mock('./db', () => ({
-  prisma: {
+vi.mock('./db', () => {
+  const prismaMock: any = {
     persona: { findUnique: hoisted.personaFindUnique },
     product: { findUnique: hoisted.productFindUnique },
     conversation: {
@@ -41,8 +49,12 @@ vi.mock('./db', () => ({
       update: hoisted.convUpdate,
     },
     message: { createMany: hoisted.messageCreateMany },
-  },
-}));
+    userSimulationUsage: { upsert: hoisted.simUsageUpsert, update: hoisted.simUsageUpdate },
+    $queryRaw: hoisted.queryRaw,
+    $transaction: async (fn: any) => fn(prismaMock),
+  };
+  return { prisma: prismaMock };
+});
 
 import { app } from './server';
 
@@ -55,11 +67,15 @@ const basePersona = {
 
 function resetMocks() {
   hoisted.llmChat.mockClear();
+  hoisted.llmChatWithUsage.mockClear();
   hoisted.getTopWeaknessesForUser.mockReset();
   hoisted.getLiveCoachingAfterChatTurn.mockReset();
   hoisted.personaFindUnique.mockResolvedValue(basePersona);
   hoisted.productFindUnique.mockResolvedValue(null);
   hoisted.messageCreateMany.mockResolvedValue({ count: 2 });
+  hoisted.simUsageUpsert.mockResolvedValue({});
+  hoisted.simUsageUpdate.mockResolvedValue({});
+  hoisted.queryRaw.mockResolvedValue([{ userId: 'u1', uniqueSimulationsCount: 0 }]);
   hoisted.convCreate.mockResolvedValue({
     id: 'c-new',
     personaId: 'p1',

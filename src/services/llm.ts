@@ -7,6 +7,7 @@ const client = new OpenAI({
 });
 
 export type Msg = { role: 'system' | 'user' | 'assistant'; content: string };
+export type LlmUsage = { promptTokens: number; completionTokens: number; totalTokens: number };
 
 type JudgeInput = { rubric: string; transcript: string; persona: string };
 type JudgeOutput = {
@@ -49,6 +50,22 @@ export const llm = {
     });
 
     return completion.choices[0]?.message?.content ?? '';
+  },
+
+  async chatWithUsage(messages: Msg[]): Promise<{ content: string; usage: LlmUsage }> {
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+    });
+    const usage = completion.usage;
+    return {
+      content: completion.choices[0]?.message?.content ?? '',
+      usage: {
+        promptTokens: usage?.prompt_tokens ?? 0,
+        completionTokens: usage?.completion_tokens ?? 0,
+        totalTokens: usage?.total_tokens ?? 0,
+      },
+    };
   },
 
   async judge(input: JudgeInput): Promise<JudgeOutput> {

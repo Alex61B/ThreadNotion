@@ -3,6 +3,11 @@ export type Msg = {
     role: 'system' | 'user' | 'assistant';
     content: string;
 };
+export type LlmUsage = {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+};
 type JudgeInput = {
     rubric: string;
     transcript: string;
@@ -38,6 +43,10 @@ export type EvaluateSalesSkillsInput = {
 };
 export declare const llm: {
     chat(messages: Msg[]): Promise<string>;
+    chatWithUsage(messages: Msg[]): Promise<{
+        content: string;
+        usage: LlmUsage;
+    }>;
     judge(input: JudgeInput): Promise<JudgeOutput>;
     /**
      * Structured evaluation for six canonical sales skills. Caller must validate with Zod.

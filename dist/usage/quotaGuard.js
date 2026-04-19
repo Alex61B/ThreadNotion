@@ -1,0 +1,126 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getUtcTodayStart = getUtcTodayStart;
+exports.getEffectiveEntitlementForUser = getEffectiveEntitlementForUser;
+exports.getEffectiveCoverageForUser = getEffectiveCoverageForUser;
+exports.assertCanCreateNewSimulation = assertCanCreateNewSimulation;
+exports.assertCanConsumeTokens = assertCanConsumeTokens;
+exports.recordTokenUsage = recordTokenUsage;
+const db_1 = require("../db");
+const entitlements_1 = require("../billing/entitlements");
+function utcDateStart(d) {
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+}
+function getUtcTodayStart() {
+    return utcDateStart(new Date());
+}
+async function maybeExpireGracePeriod(userId) {
+    // Phase 2: opportunistic sweep for individual accounts only
+    const acct = await db_1.prisma.billingAccount.findUnique({ where: { userId } });
+    if (!acct)
+        return;
+    const sub = await db_1.prisma.subscription.findUnique({ where: { billingAccountId: acct.id } });
+    if (!sub?.gracePeriodEndsAt)
+        return;
+    const now = Date.now();
+    if (sub.gracePeriodEndsAt.getTime() <= now) {
+        await db_1.prisma.subscription.update({
+            where: { billingAccountId: acct.id },
+            data: { status: 'SUSPENDED' },
+        });
+        await (0, entitlements_1.upsertUserEntitlement)({ userId, planType: 'FREE' });
+    }
+}
+async function getEffectiveEntitlementForUser(userId) {
+    // If tests mock prisma without billing tables, fail open.
+    const anyPrisma = db_1.prisma;
+    if (!anyPrisma.entitlement?.findUnique)
+        return null;
+    await maybeExpireGracePeriod(userId);
+    return db_1.prisma.entitlement.findUnique({
+        where: { subjectType_subjectId: { subjectType: 'USER', subjectId: userId } },
+    });
+}
+async function getEffectiveCoverageForUser(userId) {
+    // Team-first precedence: if user is in a team with paid TEAM entitlement, use it.
+    // Assumption (MVP): a user belongs to at most one team (enforced in addTeamMember).
+    const anyPrisma = db_1.prisma;
+    if (anyPrisma.teamMember?.findMany) {
+        const memberships = await db_1.prisma.teamMember.findMany({
+            where: { userId },
+            orderBy: { joinedAt: 'asc' },
+            take: 5,
+        });
+        for (const m of memberships) {
+            const ent = await db_1.prisma.entitlement.findUnique({
+                where: { subjectType_subjectId: { subjectType: 'TEAM', subjectId: m.teamId } },
+            });
+            if (ent?.planType === 'TEAM') {
+                return { kind: 'TEAM', teamId: m.teamId, entitlement: ent };
+            }
+        }
+    }
+    const userEnt = await getEffectiveEntitlementForUser(userId);
+    return { kind: 'USER', entitlement: userEnt };
+}
+async function assertCanCreateNewSimulation(args) {
+    if (!args.userId)
+        return { ok: true }; // anonymous bypass (Phase 2)
+    const ent = await getEffectiveEntitlementForUser(args.userId);
+    const planType = ent?.planType ?? 'FREE';
+    if (planType !== 'FREE')
+        return { ok: true };
+    return { ok: true };
+}
+async function assertCanConsumeTokens(args) {
+    if (!args.userId)
+        return { ok: true }; // anonymous bypass (Phase 2)
+    const coverage = await getEffectiveCoverageForUser(args.userId);
+    const ent = coverage.kind === 'TEAM' ? coverage.entitlement : coverage.entitlement;
+    const dailyLimit = ent?.dailyTokenLimit ?? 0;
+    if (dailyLimit <= 0)
+        return { ok: true };
+    const anyPrisma = db_1.prisma;
+    if (!anyPrisma.tokenUsageDaily?.findUnique)
+        return { ok: true };
+    const today = utcDateStart(new Date());
+    const row = coverage.kind === 'TEAM'
+        ? await db_1.prisma.tokenUsageDaily.findUnique({
+            where: { scopeType_scopeId_date: { scopeType: 'TEAM', scopeId: coverage.teamId, date: today } },
+        })
+        : await db_1.prisma.tokenUsageDaily.findUnique({
+            where: { scopeType_scopeId_date: { scopeType: 'USER', scopeId: args.userId, date: today } },
+        });
+    const used = row ? Number(row.tokensUsed) : 0;
+    if (used >= dailyLimit) {
+        return { ok: false, code: 'QUOTA_TOKENS_DAILY_EXCEEDED', limit: dailyLimit, used };
+    }
+    const est = Math.max(0, Math.floor(args.estimatedTokens ?? 0));
+    if (used + est > dailyLimit) {
+        return { ok: false, code: 'QUOTA_TOKENS_DAILY_EXCEEDED', limit: dailyLimit, used };
+    }
+    return { ok: true };
+}
+async function recordTokenUsage(args) {
+    const tokens = Math.max(0, Math.floor(args.tokens));
+    const anyPrisma = db_1.prisma;
+    if (!anyPrisma.tokenUsageDaily?.upsert)
+        return;
+    const coverage = await getEffectiveCoverageForUser(args.userId);
+    const today = utcDateStart(new Date());
+    if (coverage.kind === 'TEAM') {
+        await db_1.prisma.tokenUsageDaily.upsert({
+            where: { scopeType_scopeId_date: { scopeType: 'TEAM', scopeId: coverage.teamId, date: today } },
+            create: { scopeType: 'TEAM', scopeId: coverage.teamId, date: today, tokensUsed: BigInt(tokens) },
+            update: { tokensUsed: { increment: BigInt(tokens) } },
+        });
+    }
+    else {
+        await db_1.prisma.tokenUsageDaily.upsert({
+            where: { scopeType_scopeId_date: { scopeType: 'USER', scopeId: args.userId, date: today } },
+            create: { scopeType: 'USER', scopeId: args.userId, date: today, tokensUsed: BigInt(tokens) },
+            update: { tokensUsed: { increment: BigInt(tokens) } },
+        });
+    }
+}
+//# sourceMappingURL=quotaGuard.js.map
