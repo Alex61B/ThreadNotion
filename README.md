@@ -17,7 +17,7 @@ Use these on hosts like Render when the **root directory is the repository root*
 | Build | `npm run build:web` |
 | Start | `npm run start:web` |
 
-If Render’s **root directory** is `web/` instead, run Prisma generate in the build step, e.g. `cd .. && npx prisma generate --schema=../prisma/schema.prisma && npm run build`, then `npm start` inside `web/`.
+If Render’s **root directory** is `web/` instead, install **parent** dependencies too (shared `src/` imports resolve from the repo root unless you configure otherwise), then build, e.g. `cd .. && npm install && cd web && npx prisma generate --schema=../prisma/schema.prisma && npm run build`, then `npm start` inside `web/`. Prefer setting the service **root directory** to the repository root and using the table above.
 
 ### Integrations
 
