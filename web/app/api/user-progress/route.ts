@@ -1,33 +1,23 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../auth';
-import { deriveActingUserId } from '../../../../src/webProxy/authHardening';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
+import { getUserProgress } from '@server/api/handlers/training';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
-    const { searchParams } = new URL(request.url);
-    const clientUserId = searchParams.get('userId');
-    const userId = deriveActingUserId({ session, clientProvidedUserId: clientUserId });
+    const userId = session?.user?.id;
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const res = await fetch(`${API_BASE}/user-progress?userId=${encodeURIComponent(userId)}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await getUserProgress(userId);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('User progress API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch user progress' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to fetch user progress' } });
   }
 }

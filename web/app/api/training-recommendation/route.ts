@@ -1,33 +1,23 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../auth';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
+import { getTrainingRecommendation } from '@server/api/handlers/training';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const res = await fetch(
-      `${API_BASE}/training-recommendation?userId=${encodeURIComponent(userId)}`,
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await getTrainingRecommendation(userId);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Training recommendation API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch training recommendation' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to fetch training recommendation' } });
   }
 }

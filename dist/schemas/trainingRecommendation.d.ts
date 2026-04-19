@@ -5,9 +5,9 @@ export declare const SimulationModeRecommendationSchema: z.ZodEnum<{
     drill: "drill";
 }>;
 export declare const ConfidenceSchema: z.ZodEnum<{
-    low: "low";
-    medium: "medium";
     high: "high";
+    medium: "medium";
+    low: "low";
 }>;
 export declare const TrainingRecommendationSchema: z.ZodObject<{
     recommendedMode: z.ZodEnum<{
@@ -33,9 +33,9 @@ export declare const TrainingRecommendationSchema: z.ZodObject<{
     }>>;
     rationale: z.ZodString;
     confidence: z.ZodOptional<z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>>;
     sourceFactors: z.ZodDefault<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;

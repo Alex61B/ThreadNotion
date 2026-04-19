@@ -14,7 +14,7 @@ Locates and maps code — does not modify anything.
 
 ## Responsibilities
 - Find files by feature, model, or behavior
-- Trace request flow from Next.js route → Express handler → service → Prisma
+- Trace request flow from Next.js route → `src/api/handlers` → service → Prisma (optional Express in `src/server.ts` for tests only)
 - Identify which service owns a piece of business logic
 - Map which files would be affected by a proposed change
 - Answer "where does X happen?" questions

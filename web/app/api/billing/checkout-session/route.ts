@@ -1,14 +1,13 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
+import { postUserBillingCheckoutSession } from '@server/api/handlers/billing';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
@@ -18,17 +17,10 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     body.userId = userId;
-
-    const res = await fetch(`${API_BASE}/api/billing/checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await postUserBillingCheckoutSession(body);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Billing checkout-session API error:', error);
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to create checkout session' } });
   }
 }
-

@@ -2,8 +2,8 @@ import { Prisma } from '../../generated/prisma';
 export declare function evaluateConversation(conversationId: string): Promise<{
     conversationId: string;
     summary: {
-        userId: string | null;
         id: string;
+        userId: string | null;
         createdAt: Date;
         recommendedTips: Prisma.JsonValue;
         conversationId: string;
@@ -14,8 +14,8 @@ export declare function evaluateConversation(conversationId: string): Promise<{
         rawEvaluatorOutput: Prisma.JsonValue;
     };
     skillScores: {
-        userId: string | null;
         id: string;
+        userId: string | null;
         createdAt: Date;
         score: number;
         reasoning: string;
@@ -23,20 +23,20 @@ export declare function evaluateConversation(conversationId: string): Promise<{
         conversationId: string;
     }[];
     weaknessProfile: {
-        userId: string;
         id: string;
-        updatedAt: Date;
+        userId: string;
         createdAt: Date;
+        updatedAt: Date;
         skill: import("../../generated/prisma").$Enums.SalesSkill;
-        currentScore: number;
         trendDirection: import("../../generated/prisma").$Enums.TrendDirection;
+        currentScore: number;
         lastSimulationId: string | null;
     }[];
 }>;
 export declare function getEvaluationForConversation(conversationId: string): Promise<{
     summary: {
-        userId: string | null;
         id: string;
+        userId: string | null;
         createdAt: Date;
         recommendedTips: Prisma.JsonValue;
         conversationId: string;
@@ -47,8 +47,8 @@ export declare function getEvaluationForConversation(conversationId: string): Pr
         rawEvaluatorOutput: Prisma.JsonValue;
     };
     skillScores: {
-        userId: string | null;
         id: string;
+        userId: string | null;
         createdAt: Date;
         score: number;
         reasoning: string;

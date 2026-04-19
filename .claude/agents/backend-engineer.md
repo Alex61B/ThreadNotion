@@ -12,12 +12,13 @@ skills:
   - execution-verification-before-completion
 ---
 
-Implements and maintains the Express backend and Next.js API proxy layer.
+Implements and maintains shared server logic and Next.js API routes.
 
 ## Responsibilities
-- Add or modify Express route handlers in `src/server.ts`
-- Add or modify service logic in `src/services/`
-- Maintain the auth identity-overwrite pattern in `web/app/api/` proxy routes
+- Add or modify shared handlers in `src/api/handlers/` and services in `src/services/`
+- Add or modify `web/app/api/**/route.ts` to call handlers with `auth()` and thin wiring
+- Update `src/server.ts` only when Vitest/supertest needs the Express mirror (not production)
+- Maintain the auth identity-overwrite pattern in `web/app/api/` route handlers
 - Ensure routes stay thin and logic stays in services
 - Handle LLM integration changes in `src/services/llm.ts`
 

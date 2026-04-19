@@ -3,20 +3,27 @@
 If a line here wouldn’t prevent a likely mistake, delete it.
 
 ## Project snapshot
-- **Backend**: Node/TypeScript Express app at repo root (`src/` → `dist/`).
+- **API (production)**: Next.js route handlers in `web/app/api/` calling shared modules under `src/` (`@server/*` from `web/`).
+- **Shared logic**: `src/api/handlers/`, `src/services/`, `src/billing/` (TypeScript at repo root).
+- **Optional Express**: `src/server.ts` for legacy tests / split-stack dev (`npm run dev` at root).
 - **Frontend**: Next.js app in `web/` (App Router).
 - **DB**: PostgreSQL via Prisma. **Schema lives at repo root**: `prisma/schema.prisma`.
 - **Prisma Client output**: `generated/prisma` (gitignored). Regenerate after schema changes.
 
 ## Repo layout
-- Root: Express server + shared domain/services (`src/`, `dist/`, `prisma/`, `generated/`).
-- `web/`: Next.js UI + NextAuth v5 + API routes (`web/app/`, `web/middleware.ts`).
+- Root: shared server code + Prisma (`src/`, `prisma/`, `generated/`, optional `dist/` for Express build).
+- `web/`: Next.js UI + NextAuth v5 + production API routes (`web/app/api/`, `web/middleware.ts`).
 
 ## Commands you should use (don’t guess)
 
+### Production (Next)
+- **Build (repo root):** `npm run build:web` — Prisma generate + `next build` in `web/`
+- **Start (repo root):** `npm run start:web` — `next start` in `web/`
+- Root `npm start` runs **Express** (`dist/server.js`); use only for legacy/local harness, not production.
+
 ### Dev
-- **Backend dev** (root): `npm run dev`
-- **Web dev**: `cd web && npm run dev`
+- **App (recommended)**: `cd web && npm run dev` (Next UI + `/api/*` on default port)
+- **Legacy Express only** (root): `npm run dev`
 
 ### Typecheck
 - **Backend**: `npx tsc -p tsconfig.json`
@@ -33,7 +40,9 @@ If a line here wouldn’t prevent a likely mistake, delete it.
 - **Prod deploy migrations**: `npx prisma migrate deploy --schema=prisma/schema.prisma`
 - **Studio**: `npx prisma studio --schema=prisma/schema.prisma`
 
-## Render deployment notes (single service: backend + Next)
+## Render deployment notes (single Next service)
+- **Build:** `npm install && npm run build:web` (from repo root)
+- **Start:** `npm run start:web`
 - **Node version**: 20.19.0
 - **Prisma**: pinned to v6 (keep both root + `web/` aligned)
 - Use **explicit Prisma schema path** in build steps if Render runs commands outside repo root.
@@ -45,6 +54,6 @@ If a line here wouldn’t prevent a likely mistake, delete it.
 - Don’t commit generated artifacts unless the repo already does.
 
 ## Pointers
-- `@README.md` (project overview; may be stale vs current Node/Next/Prisma reality)
+- `@README.md` (deployment, env vars, Stripe/cron URLs)
 - `@package.json` and `@web/package.json` (canonical scripts)
 - `@prisma/schema.prisma` (data model + Prisma client output path)

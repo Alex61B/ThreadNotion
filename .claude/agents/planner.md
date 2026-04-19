@@ -12,7 +12,7 @@ skills:
 Plans implementation work before code is written.
 
 ## Responsibilities
-- Identify which layers a task touches (web proxy, Express service, Prisma schema, UI)
+- Identify which layers a task touches (Next route handlers, shared `src/api/handlers`, services, Prisma schema, UI)
 - Break work into ordered phases with clear dependencies
 - Choose the right specialist agent for each phase
 - Flag protected invariants the task must not violate

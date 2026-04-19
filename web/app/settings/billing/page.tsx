@@ -166,6 +166,7 @@ export default function BillingPage() {
     try {
       const res = await fetch('/api/billing/checkout-session', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planType: 'INDIVIDUAL' }),
       });
@@ -184,7 +185,10 @@ export default function BillingPage() {
   async function openUserPortal() {
     setBusyAction('user_portal');
     try {
-      const res = await fetch('/api/billing/portal-session', { method: 'POST' });
+      const res = await fetch('/api/billing/portal-session', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
       const json = await res.json();
       const url = json?.portalUrl as string | undefined;
       if (!res.ok || !url) throw new Error(json?.error ?? 'Could not open portal');
@@ -200,7 +204,7 @@ export default function BillingPage() {
   async function cancelUserPlan() {
     setBusyAction('user_cancel');
     try {
-      const res = await fetch('/api/billing/cancel', { method: 'POST' });
+      const res = await fetch('/api/billing/cancel', { method: 'POST', credentials: 'same-origin' });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? 'Cancel failed');
       await loadUser();
@@ -218,6 +222,7 @@ export default function BillingPage() {
     try {
       const res = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/billing/checkout-session`, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seatBundle }),
       });
@@ -237,7 +242,10 @@ export default function BillingPage() {
     if (!selectedTeamId) return;
     setBusyAction('team_portal');
     try {
-      const res = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/billing/portal-session`, { method: 'POST' });
+      const res = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/billing/portal-session`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
       const json = await res.json();
       const url = json?.portalUrl as string | undefined;
       if (!res.ok || !url) throw new Error(json?.error ?? 'Could not open portal');
@@ -254,7 +262,10 @@ export default function BillingPage() {
     if (!selectedTeamId) return;
     setBusyAction('team_cancel');
     try {
-      const res = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/billing/cancel`, { method: 'POST' });
+      const res = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/billing/cancel`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? 'Cancel failed');
       await loadTeamBilling(selectedTeamId);

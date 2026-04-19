@@ -9,13 +9,13 @@ export declare function updateProfilesAfterSimulation(args: {
     skillScores: Record<SalesSkill, number>;
 }): Promise<void>;
 export declare function listWeaknessProfilesForUser(userId: string): Promise<{
-    userId: string;
     id: string;
-    updatedAt: Date;
+    userId: string;
     createdAt: Date;
+    updatedAt: Date;
     skill: import("../../generated/prisma").$Enums.SalesSkill;
-    currentScore: number;
     trendDirection: import("../../generated/prisma").$Enums.TrendDirection;
+    currentScore: number;
     lastSimulationId: string | null;
 }[]>;
 //# sourceMappingURL=weaknessProfileService.d.ts.map

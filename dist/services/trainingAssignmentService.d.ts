@@ -14,14 +14,14 @@ export declare function createTrainingAssignment(args: {
         ownerId: string;
     };
 } & {
-    teamId: string;
-    active: boolean;
     id: string;
     createdAt: Date;
+    teamId: string;
     skill: import("../../generated/prisma").$Enums.SalesSkill;
     assignedBy: string;
     targetUserId: string | null;
     assignmentType: import("../../generated/prisma").$Enums.TrainingAssignmentType;
+    active: boolean;
 }>;
 export declare function listAssignmentsForTeam(teamId: string): Promise<({
     team: {
@@ -31,14 +31,14 @@ export declare function listAssignmentsForTeam(teamId: string): Promise<({
         ownerId: string;
     };
 } & {
-    teamId: string;
-    active: boolean;
     id: string;
     createdAt: Date;
+    teamId: string;
     skill: import("../../generated/prisma").$Enums.SalesSkill;
     assignedBy: string;
     targetUserId: string | null;
     assignmentType: import("../../generated/prisma").$Enums.TrainingAssignmentType;
+    active: boolean;
 })[]>;
 /** Active assignments visible to this user (direct or team-wide for teams they belong to). */
 export declare function listActiveAssignmentsForUser(userId: string): Promise<({
@@ -49,14 +49,14 @@ export declare function listActiveAssignmentsForUser(userId: string): Promise<({
         ownerId: string;
     };
 } & {
-    teamId: string;
-    active: boolean;
     id: string;
     createdAt: Date;
+    teamId: string;
     skill: import("../../generated/prisma").$Enums.SalesSkill;
     assignedBy: string;
     targetUserId: string | null;
     assignmentType: import("../../generated/prisma").$Enums.TrainingAssignmentType;
+    active: boolean;
 })[]>;
 export declare function deactivateTrainingAssignment(id: string, teamId: string, managerUserId: string): Promise<void>;
 //# sourceMappingURL=trainingAssignmentService.d.ts.map

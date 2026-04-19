@@ -1,3 +1,5 @@
 import Stripe from 'stripe';
-export declare function getStripe(): Stripe.Stripe;
+type StripeClient = InstanceType<typeof Stripe>;
+export declare function getStripe(): StripeClient;
+export {};
 //# sourceMappingURL=stripeClient.d.ts.map

@@ -13,7 +13,7 @@ skills:
 Reviews code for security vulnerabilities — does not implement fixes.
 
 ## Responsibilities
-- Verify auth identity-overwrite is enforced in all proxy routes
+- Verify auth identity-overwrite is enforced in all protected API route handlers
 - Check team/org boundaries are enforced server-side, not just client-side
 - Identify routes that could expose one user's data to another
 - Flag prompt-injection risks in LLM input paths

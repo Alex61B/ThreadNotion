@@ -14,7 +14,7 @@ Reviews code changes for correctness, pattern consistency, and missing edge case
 
 ## Responsibilities
 - Check that routes stay thin and logic lives in services
-- Verify auth identity-overwrite pattern is followed in any new proxy routes
+- Verify auth identity-overwrite pattern is followed in any new API route handlers
 - Flag response shapes that leak DB model structure or break additive extension rules
 - Catch missing error handling, unhandled null cases, and uncovered edge paths
 - Confirm the change doesn't add friction to the core training flow

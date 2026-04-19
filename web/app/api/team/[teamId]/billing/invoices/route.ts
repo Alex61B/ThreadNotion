@@ -1,36 +1,24 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../../../../auth';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
-
-type RouteContext = { params: { teamId: string } };
+import { getTeamBillingInvoices } from '@server/api/handlers/billing';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest, context: RouteContext) {
+type Params = { params: { teamId: string } };
+
+export async function GET(_request: Request, { params }: Params) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const cookie = request.headers.get('cookie') ?? undefined;
-    const teamId = context.params.teamId;
-    const res = await fetch(`${API_BASE}/api/team/${encodeURIComponent(teamId)}/billing/invoices`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookie ? { cookie } : {}),
-      },
-    });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await getTeamBillingInvoices(params.teamId, session.user.id);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Team billing invoices API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch team invoices' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to fetch team invoices' } });
   }
 }
-

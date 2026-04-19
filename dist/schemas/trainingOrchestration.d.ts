@@ -43,9 +43,9 @@ export declare const OrchestratedTrainingRecommendationSchema: z.ZodObject<{
         generic_fallback: "generic_fallback";
     }>>;
     confidence: z.ZodOptional<z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>>;
     sourceFactors: z.ZodDefault<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;

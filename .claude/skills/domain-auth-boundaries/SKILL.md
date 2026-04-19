@@ -4,10 +4,10 @@ description: Use when working with authentication, session identity, user isolat
 ---
 
 - Auth stack: next-auth v5 beta (5.0.0-beta.25) + @auth/prisma-adapter v1.0.0
-- Session identity is at `session.user.id` — always derive userId from there, never from client body or query params
-- `src/webProxy/authHardening.ts` — `deriveActingUserId()` is the canonical helper; use it in all proxy routes
-- All `web/app/api/` routes overwrite any client-provided `userId` with `session.user.id` before forwarding to Express
-- Express receives a userId that was validated by the proxy — but new Express routes added directly must not trust raw body userId
+- Session identity is at `session.user.id` — always derive userId from `auth()` in route handlers, never from client body or query params alone
+- `src/webProxy/authHardening.ts` — `deriveActingUserId()` where you need cookie-level hardening; most API routes use `auth()` directly
+- `web/app/api/` route handlers overwrite any client-provided `userId` with `session.user.id` before calling `@server/api/handlers/*`
+- Production API never trusts raw body `userId` — shared handlers receive server-trusted ids from Next routes
 - Anonymous users use a localStorage UUID as userId — tracked in `AnonymousIdentityClaim` for post-login merge
 - `AnonymousIdentityClaim` links anonymous UUID → authenticated `User.id` after sign-in; check before assuming userId is auth'd
 - `AccountRole` on `User`: `MANAGER` or `SALES_REP` — used for access control and team management gates

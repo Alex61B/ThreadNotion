@@ -1,8 +1,10 @@
 import Stripe from 'stripe';
 
-let stripeSingleton: Stripe.Stripe | null = null;
+type StripeClient = InstanceType<typeof Stripe>;
 
-export function getStripe(): Stripe.Stripe {
+let stripeSingleton: StripeClient | null = null;
+
+export function getStripe(): StripeClient {
   if (stripeSingleton) return stripeSingleton;
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {

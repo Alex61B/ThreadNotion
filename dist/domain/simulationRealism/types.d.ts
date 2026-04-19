@@ -1,14 +1,14 @@
 import { z } from 'zod';
 export declare const DomainExperienceSchema: z.ZodEnum<{
-    low: "low";
-    medium: "medium";
     high: "high";
+    medium: "medium";
+    low: "low";
 }>;
 export type DomainExperience = z.infer<typeof DomainExperienceSchema>;
 export declare const RiskToleranceSchema: z.ZodEnum<{
-    low: "low";
-    medium: "medium";
     high: "high";
+    medium: "medium";
+    low: "low";
 }>;
 export type RiskTolerance = z.infer<typeof RiskToleranceSchema>;
 export declare const CommunicationStyleSchema: z.ZodEnum<{
@@ -19,28 +19,28 @@ export declare const CommunicationStyleSchema: z.ZodEnum<{
 }>;
 export type CommunicationStyle = z.infer<typeof CommunicationStyleSchema>;
 export declare const TimePressureSchema: z.ZodEnum<{
-    low: "low";
-    medium: "medium";
     high: "high";
+    medium: "medium";
+    low: "low";
 }>;
 export type TimePressure = z.infer<typeof TimePressureSchema>;
 export declare const OpennessToChangeSchema: z.ZodEnum<{
-    low: "low";
-    medium: "medium";
     high: "high";
+    medium: "medium";
+    low: "low";
 }>;
 export type OpennessToChange = z.infer<typeof OpennessToChangeSchema>;
 export declare const PersonaTraitsSchema: z.ZodObject<{
     role: z.ZodString;
     domainExperience: z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>;
     riskTolerance: z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>;
     communicationStyle: z.ZodEnum<{
         concise: "concise";
@@ -49,14 +49,14 @@ export declare const PersonaTraitsSchema: z.ZodObject<{
         skeptical: "skeptical";
     }>;
     timePressure: z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>;
     opennessToChange: z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>;
 }, z.core.$strip>;
 export type PersonaTraits = z.infer<typeof PersonaTraitsSchema>;
@@ -86,14 +86,14 @@ export declare const SimulationRealismSchema: z.ZodObject<{
     personaTraits: z.ZodObject<{
         role: z.ZodString;
         domainExperience: z.ZodEnum<{
-            low: "low";
-            medium: "medium";
             high: "high";
+            medium: "medium";
+            low: "low";
         }>;
         riskTolerance: z.ZodEnum<{
-            low: "low";
-            medium: "medium";
             high: "high";
+            medium: "medium";
+            low: "low";
         }>;
         communicationStyle: z.ZodEnum<{
             concise: "concise";
@@ -102,14 +102,14 @@ export declare const SimulationRealismSchema: z.ZodObject<{
             skeptical: "skeptical";
         }>;
         timePressure: z.ZodEnum<{
-            low: "low";
-            medium: "medium";
             high: "high";
+            medium: "medium";
+            low: "low";
         }>;
         opennessToChange: z.ZodEnum<{
-            low: "low";
-            medium: "medium";
             high: "high";
+            medium: "medium";
+            low: "low";
         }>;
     }, z.core.$strip>;
     buyerKnowledgeLevel: z.ZodEnum<{

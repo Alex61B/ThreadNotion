@@ -28,9 +28,9 @@ export declare function getTeam(teamId: string): Promise<{
     ownerId: string;
 } | null>;
 export declare function listTeamMembers(teamId: string): Promise<{
+    id: string;
     userId: string;
     teamId: string;
-    id: string;
     role: import("../../generated/prisma").$Enums.TeamMemberRole;
     displayName: string | null;
     joinedAt: Date;
@@ -44,9 +44,9 @@ export declare function addTeamMember(args: {
     role?: Prisma.TeamMemberCreateInput['role'];
     displayName?: string;
 }): Promise<{
+    id: string;
     userId: string;
     teamId: string;
-    id: string;
     role: import("../../generated/prisma").$Enums.TeamMemberRole;
     displayName: string | null;
     joinedAt: Date;

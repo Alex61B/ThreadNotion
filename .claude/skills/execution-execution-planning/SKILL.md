@@ -3,7 +3,7 @@ name: execution-execution-planning
 description: Use when breaking down a multi-step task into an ordered implementation plan before any code is written.
 ---
 
-- Identify all layers touched before proposing steps: schema, service, route, proxy, UI
+- Identify all layers touched before proposing steps: schema, service, shared handler, Next route, UI
 - Order phases by dependency — schema before service, service before route, route before UI
 - Name the right specialist agent for each phase — don't assign implementation to planner
 - Flag protected invariants the task must not violate before any phase begins

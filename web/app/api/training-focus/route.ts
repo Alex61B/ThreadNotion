@@ -1,75 +1,58 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../auth';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
+import {
+  deleteTrainingFocus,
+  getTrainingFocus,
+  patchTrainingFocus,
+} from '@server/api/handlers/training';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const res = await fetch(`${API_BASE}/training-focus?userId=${encodeURIComponent(userId)}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await getTrainingFocus(userId);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Training focus API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch training focus' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to fetch training focus' } });
   }
 }
 
-export async function PATCH(request: NextRequest) {
+export async function PATCH(request: Request) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
     const body = await request.json();
-
-    const res = await fetch(`${API_BASE}/training-focus?userId=${encodeURIComponent(userId)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await patchTrainingFocus(userId, body);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Training focus API error:', error);
-    return NextResponse.json({ error: 'Failed to update training focus' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to update training focus' } });
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const res = await fetch(`${API_BASE}/training-focus?userId=${encodeURIComponent(userId)}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await deleteTrainingFocus(userId);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Training focus API error:', error);
-    return NextResponse.json({ error: 'Failed to clear training focus' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to clear training focus' } });
   }
 }

@@ -46,14 +46,14 @@ export declare const DrillPlanStoredSchema: z.ZodObject<{
             personaTraits: z.ZodObject<{
                 role: z.ZodString;
                 domainExperience: z.ZodEnum<{
-                    low: "low";
-                    medium: "medium";
                     high: "high";
+                    medium: "medium";
+                    low: "low";
                 }>;
                 riskTolerance: z.ZodEnum<{
-                    low: "low";
-                    medium: "medium";
                     high: "high";
+                    medium: "medium";
+                    low: "low";
                 }>;
                 communicationStyle: z.ZodEnum<{
                     concise: "concise";
@@ -62,14 +62,14 @@ export declare const DrillPlanStoredSchema: z.ZodObject<{
                     skeptical: "skeptical";
                 }>;
                 timePressure: z.ZodEnum<{
-                    low: "low";
-                    medium: "medium";
                     high: "high";
+                    medium: "medium";
+                    low: "low";
                 }>;
                 opennessToChange: z.ZodEnum<{
-                    low: "low";
-                    medium: "medium";
                     high: "high";
+                    medium: "medium";
+                    low: "low";
                 }>;
             }, z.core.$strip>;
             buyerKnowledgeLevel: z.ZodEnum<{
@@ -119,11 +119,11 @@ export declare function safeParseDrillPlanStored(json: unknown): z.ZodSafeParseR
         simulationRealism?: {
             personaTraits: {
                 role: string;
-                domainExperience: "low" | "medium" | "high";
-                riskTolerance: "low" | "medium" | "high";
+                domainExperience: "high" | "medium" | "low";
+                riskTolerance: "high" | "medium" | "low";
                 communicationStyle: "concise" | "analytical" | "story-driven" | "skeptical";
-                timePressure: "low" | "medium" | "high";
-                opennessToChange: "low" | "medium" | "high";
+                timePressure: "high" | "medium" | "low";
+                opennessToChange: "high" | "medium" | "low";
             };
             buyerKnowledgeLevel: "uninformed" | "partially_informed" | "competitor_aware" | "expert";
             customerBehavior: "skeptical" | "cooperative" | "guarded" | "impatient" | "curious";

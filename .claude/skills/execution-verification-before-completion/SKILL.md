@@ -9,7 +9,7 @@ description: Use before claiming any task is complete, fixed, or passing — req
 - Check adjacent features for regressions: evaluation flow, auth, simulation mode creation
 - If schema changed: verify migration ran cleanly and existing rows still parse correctly
 - If LLM contract changed: verify Zod schema validation still passes on representative sample outputs
-- If a proxy route changed: verify identity is still overwritten from session, not client body
+- If an API route changed: verify identity is still derived from `auth()`, not client body
 - If service logic changed: verify all callers (routes, tests) still receive the expected response shape
 - Don't claim complete if TypeScript errors exist anywhere in changed files
 - Don't claim complete if any previously-passing test is now failing

@@ -17,13 +17,13 @@ Builds and maintains the Next.js frontend in `web/`.
 ## Responsibilities
 - Add or modify pages under `web/app/`
 - Build React components that reflect simulation mode and evaluation state clearly
-- Integrate with backend via `web/app/api/` proxy routes
+- Integrate with backend via same-origin `/api/*` (Next route handlers)
 - Maintain feedback scannability and training flow UX principles
 - Handle session state and auth-gated UI
 
 ## When to use vs. other agents
 - Use for anything under `web/app/` (pages, components, layout)
-- Use backend-engineer for `web/app/api/` proxy route logic
+- Use backend-engineer for `web/app/api/` route and `src/api/handlers` logic
 - Use system-architect if a UI change implies a new data flow or API contract
 
 ## Skills

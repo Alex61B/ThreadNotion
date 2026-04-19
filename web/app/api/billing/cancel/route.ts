@@ -1,33 +1,22 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
+import { postUserBillingCancel } from '@server/api/handlers/billing';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const cookie = request.headers.get('cookie') ?? undefined;
-    const res = await fetch(`${API_BASE}/api/billing/cancel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookie ? { cookie } : {}),
-      },
-    });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await postUserBillingCancel(session.user.id);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Billing cancel API error:', error);
-    return NextResponse.json({ error: 'Failed to cancel subscription' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to cancel subscription' } });
   }
 }
-

@@ -723,10 +723,10 @@ function BackendOffline({ onRetry }: { onRetry: () => void }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Backend Unavailable</h1>
+        <h1 className="text-2xl font-bold text-white mb-2">Service Unavailable</h1>
         <p className="text-zinc-400 mb-6">
           {process.env.NODE_ENV === 'development'
-            ? 'Unable to connect to the ThreadNotion API. Make sure the backend server is running on port 3001.'
+            ? 'Unable to reach the app API. From the web directory, run the Next dev server and confirm /api/health returns ok.'
             : 'Unable to reach the ThreadNotion API. The service may be starting up or temporarily unavailable.'}
         </p>
         <div className="space-y-3">
@@ -739,8 +739,8 @@ function BackendOffline({ onRetry }: { onRetry: () => void }) {
           </button>
           {process.env.NODE_ENV === 'development' && (
             <div className="text-xs text-zinc-500">
-              <p>To start the backend:</p>
-              <code className="block mt-1 p-2 bg-zinc-900 rounded">npm run start</code>
+              <p>To run the app locally:</p>
+              <code className="block mt-1 p-2 bg-zinc-900 rounded">{'cd web && npm run dev'}</code>
             </div>
           )}
         </div>
@@ -1178,7 +1178,7 @@ export default function HomePage() {
 
     setLoadingConversations(true);
     try {
-      const res = await fetch(`/api/conversations`);
+      const res = await fetch(`/api/conversations`, { credentials: 'same-origin' });
       if (!res.ok) throw new Error('Failed to fetch conversations');
       const data = (await res.json()) as ConversationsResponse;
       if (data?.ok && Array.isArray(data.conversations)) {
@@ -1196,7 +1196,7 @@ export default function HomePage() {
   const fetchTrainingFocus = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/training-focus`);
+      const res = await fetch(`/api/training-focus`, { credentials: 'same-origin' });
       if (!res.ok) return;
       const data = (await res.json()) as { ok?: boolean; trainingFocus: TrainingFocusPayload | null };
       if (data?.ok && data.trainingFocus) {
@@ -1212,7 +1212,7 @@ export default function HomePage() {
   const fetchUserProgress = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/user-progress`);
+      const res = await fetch(`/api/user-progress`, { credentials: 'same-origin' });
       if (!res.ok) return;
       const data = (await res.json()) as {
         ok?: boolean;
@@ -1238,7 +1238,7 @@ export default function HomePage() {
   const fetchUserTrainingAnalytics = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/user-training-analytics`);
+      const res = await fetch(`/api/user-training-analytics`, { credentials: 'same-origin' });
       if (!res.ok) {
         setTrainingAnalytics(null);
         return;
@@ -1257,7 +1257,7 @@ export default function HomePage() {
   const fetchMyTeams = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/teams`);
+      const res = await fetch(`/api/teams`, { credentials: 'same-origin' });
       if (!res.ok) {
         setMyTeams([]);
         return;
@@ -1272,7 +1272,7 @@ export default function HomePage() {
   const fetchTrainingAssignments = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/training-assignments`);
+      const res = await fetch(`/api/training-assignments`, { credentials: 'same-origin' });
       if (!res.ok) {
         setTrainingAssignments([]);
         return;
@@ -1296,18 +1296,18 @@ export default function HomePage() {
     setTeamMembers([]);
     setMemberTrainingAnalytics({});
     try {
-      const aRes = await fetch(
-        `/api/team/${encodeURIComponent(selectedTeamId)}/analytics`
-      );
+      const aRes = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/analytics`, {
+        credentials: 'same-origin',
+      });
       const aData = (await aRes.json()) as { ok?: boolean; teamAnalytics?: TeamAnalyticsPayload };
       if (aRes.ok && aData.teamAnalytics) {
         setTeamAnalytics(aData.teamAnalytics);
       }
       const meta = myTeams.find((t) => t.teamId === selectedTeamId);
       if (meta?.role === 'manager') {
-        const mRes = await fetch(
-          `/api/team/${encodeURIComponent(selectedTeamId)}/members`
-        );
+        const mRes = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/members`, {
+          credentials: 'same-origin',
+        });
         const mData = (await mRes.json()) as {
           ok?: boolean;
           members?: Array<{ userId: string; role: string; displayName: string | null }>;
@@ -1319,7 +1319,8 @@ export default function HomePage() {
               const uRes = await fetch(
                 `/api/team/${encodeURIComponent(selectedTeamId)}/member-progress?memberUserId=${encodeURIComponent(
                   mem.userId
-                )}`
+                )}`,
+                { credentials: 'same-origin' }
               );
               const uData = (await uRes.json()) as { ok?: boolean; analytics?: TrainingAnalyticsPayload };
               return [mem.userId, uData.analytics] as const;
@@ -1369,6 +1370,7 @@ export default function HomePage() {
     if (existing && existing !== authUserId) {
       void fetch('/api/auth/link-anonymous', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ anonymousUserId: existing }),
       }).catch((e) => {
@@ -1556,6 +1558,7 @@ export default function HomePage() {
     try {
       const res = await fetch(`/api/training-focus`, {
         method: 'PATCH',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           focusSkills: skills.slice(0, 3),
@@ -1575,6 +1578,7 @@ export default function HomePage() {
     try {
       const res = await fetch(`/api/training-focus`, {
         method: 'DELETE',
+        credentials: 'same-origin',
       });
       if (!res.ok) return;
       setTrainingFocus(null);
@@ -1588,6 +1592,7 @@ export default function HomePage() {
     try {
       const res = await fetch('/api/teams', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newTeamName.trim() }),
       });
@@ -1606,6 +1611,7 @@ export default function HomePage() {
         `/api/team/${encodeURIComponent(selectedTeamId)}/members`,
         {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             memberUserId: addMemberId.trim(),
@@ -1634,6 +1640,7 @@ export default function HomePage() {
       }
       const res = await fetch(`/api/team/${encodeURIComponent(selectedTeamId)}/assignments`, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -1733,6 +1740,7 @@ export default function HomePage() {
 
       const res = await fetch('/api/chat', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -1778,6 +1786,7 @@ export default function HomePage() {
     try {
       const res = await fetch('/api/feedback', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversationId: idToGrade }),
       });
@@ -1836,6 +1845,7 @@ export default function HomePage() {
     try {
       const res = await fetch('/api/generate-script', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           personaId: scriptPersonaId,
@@ -1888,6 +1898,7 @@ export default function HomePage() {
     try {
       const res = await fetch('/api/feedback', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversationId: selectedConversationId }),
       });

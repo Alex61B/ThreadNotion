@@ -7,15 +7,19 @@ export function requireStripeWebhookSecret(): string {
   return v;
 }
 
-export function constructStripeEvent(req: Request) {
+/** Raw body + signature (Next.js route handlers, tests, etc.) */
+export function constructStripeEventFromBuffer(body: Buffer, signature: string) {
   const stripe = getStripe();
+  const secret = requireStripeWebhookSecret();
+  return stripe.webhooks.constructEvent(body, signature, secret);
+}
+
+export function constructStripeEvent(req: Request) {
   const signature = req.headers['stripe-signature'];
   if (!signature || typeof signature !== 'string') {
     throw new Error('Missing stripe-signature header');
   }
-  const secret = requireStripeWebhookSecret();
-  // express.raw() provides Buffer in req.body
   const body = req.body as Buffer;
-  return stripe.webhooks.constructEvent(body, signature, secret);
+  return constructStripeEventFromBuffer(body, signature);
 }
 

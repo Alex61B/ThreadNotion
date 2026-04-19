@@ -1,33 +1,22 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
-import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
-
-const API_BASE = backendHttpOrigin();
+import { getUserBillingInvoices } from '@server/api/handlers/billing';
+import { nextFromHandlerResult } from '@/lib/nextJsonHandler';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const cookie = request.headers.get('cookie') ?? undefined;
-    const res = await fetch(`${API_BASE}/api/billing/invoices`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookie ? { cookie } : {}),
-      },
-    });
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const r = await getUserBillingInvoices(session.user.id);
+    return nextFromHandlerResult(r);
   } catch (error) {
     console.error('Billing invoices API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
+    return nextFromHandlerResult({ status: 500, body: { error: 'Failed to fetch invoices' } });
   }
 }
-

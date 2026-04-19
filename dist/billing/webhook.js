@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireStripeWebhookSecret = requireStripeWebhookSecret;
+exports.constructStripeEventFromBuffer = constructStripeEventFromBuffer;
 exports.constructStripeEvent = constructStripeEvent;
 const stripeClient_1 = require("./stripeClient");
 function requireStripeWebhookSecret() {
@@ -9,15 +10,18 @@ function requireStripeWebhookSecret() {
         throw new Error('STRIPE_WEBHOOK_SECRET is required');
     return v;
 }
-function constructStripeEvent(req) {
+/** Raw body + signature (Next.js route handlers, tests, etc.) */
+function constructStripeEventFromBuffer(body, signature) {
     const stripe = (0, stripeClient_1.getStripe)();
+    const secret = requireStripeWebhookSecret();
+    return stripe.webhooks.constructEvent(body, signature, secret);
+}
+function constructStripeEvent(req) {
     const signature = req.headers['stripe-signature'];
     if (!signature || typeof signature !== 'string') {
         throw new Error('Missing stripe-signature header');
     }
-    const secret = requireStripeWebhookSecret();
-    // express.raw() provides Buffer in req.body
     const body = req.body;
-    return stripe.webhooks.constructEvent(body, signature, secret);
+    return constructStripeEventFromBuffer(body, signature);
 }
 //# sourceMappingURL=webhook.js.map

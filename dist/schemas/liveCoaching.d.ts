@@ -1,8 +1,8 @@
 import { z } from 'zod';
 export declare const LiveCoachingConfidenceSchema: z.ZodEnum<{
-    low: "low";
-    medium: "medium";
     high: "high";
+    medium: "medium";
+    low: "low";
 }>;
 export declare const LiveCoachingSuggestionSchema: z.ZodObject<{
     kind: z.ZodEnum<{
@@ -16,9 +16,9 @@ export declare const LiveCoachingSuggestionSchema: z.ZodObject<{
     message: z.ZodString;
     rationale: z.ZodOptional<z.ZodString>;
     confidence: z.ZodEnum<{
-        low: "low";
-        medium: "medium";
         high: "high";
+        medium: "medium";
+        low: "low";
     }>;
     triggerSource: z.ZodString;
 }, z.core.$strip>;
