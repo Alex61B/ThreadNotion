@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { backendHttpOrigin } from '@/lib/backendHttpOrigin';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = backendHttpOrigin();
 
 export const runtime = 'nodejs';
 

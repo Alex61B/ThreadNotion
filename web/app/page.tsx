@@ -725,7 +725,9 @@ function BackendOffline({ onRetry }: { onRetry: () => void }) {
         </div>
         <h1 className="text-2xl font-bold text-white mb-2">Backend Unavailable</h1>
         <p className="text-zinc-400 mb-6">
-          Unable to connect to the ThreadNotion API. Make sure the backend server is running on port 3001.
+          {process.env.NODE_ENV === 'development'
+            ? 'Unable to connect to the ThreadNotion API. Make sure the backend server is running on port 3001.'
+            : 'Unable to reach the ThreadNotion API. The service may be starting up or temporarily unavailable.'}
         </p>
         <div className="space-y-3">
           <button
@@ -735,10 +737,12 @@ function BackendOffline({ onRetry }: { onRetry: () => void }) {
           >
             Retry Connection
           </button>
-          <div className="text-xs text-zinc-500">
-            <p>To start the backend:</p>
-            <code className="block mt-1 p-2 bg-zinc-900 rounded">npm run start</code>
-          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-zinc-500">
+              <p>To start the backend:</p>
+              <code className="block mt-1 p-2 bg-zinc-900 rounded">npm run start</code>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1108,14 +1112,14 @@ export default function HomePage() {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${base}/health`, {
+      const res = await fetch('/api/health', {
+        credentials: 'same-origin',
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
 
-      const data = await res.json();
-      return data.ok === true;
+      const data = (await res.json()) as { ok?: boolean };
+      return res.ok && data.ok === true;
     } catch {
       return false;
     }
