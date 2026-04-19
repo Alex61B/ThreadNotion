@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn src/server.ts",
     "build": "prisma generate && tsc",
-    "build:web": "prisma generate --schema=prisma/schema.prisma && cd web && npm run build",
+    "build:web": "prisma generate --schema=prisma/schema.prisma && cd web && npm install && npm run build",
     "start": "node dist/server.js",
     "start:web": "cd web && npm start",
     "test": "vitest run",
