@@ -1,5 +1,5 @@
 import type { SalesSkill } from '../schemas/coaching';
-import { SALES_SKILLS, SalesEvaluationLLMSchema } from '../schemas/coaching';
+import { SALES_SKILLS, SalesEvaluationLLMSchema, normalizeRawEvaluatorOutput } from '../schemas/coaching';
 import { EvaluationError } from '../errors/evaluationErrors';
 import { prisma } from '../db';
 import { selectTopWeaknesses } from '../domain/weaknessSelection';
@@ -51,10 +51,14 @@ export async function evaluateConversation(conversationId: string) {
     metrics,
   });
 
-  const parseResult = SalesEvaluationLLMSchema.safeParse(raw);
+  const normalized = normalizeRawEvaluatorOutput(raw);
+  const parseResult = SalesEvaluationLLMSchema.safeParse(normalized);
   if (!parseResult.success) {
     if (process.env.VITEST !== 'true') {
-      console.error('[evaluateConversation] Evaluator output failed schema validation');
+      console.error('[evaluateConversation] Evaluator output failed schema validation', {
+        zodErrors: parseResult.error.flatten(),
+        rawOutput: JSON.stringify(raw).slice(0, 2000),
+      });
     }
     throw new EvaluationError(
       'Evaluator output failed validation',
