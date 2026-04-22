@@ -144,11 +144,11 @@ Rules:
 - Each score must be an integer from 1 to 10.
 - topWeaknesses must list exactly three skill keys from: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — ordered by priority (weakest first).
 - recommendedTips: 3–6 short, actionable tips; prioritize the weakest skills.
-- coaching.strengths: 1–6 items. The "skill" field MUST be exactly one of: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — do not invent names like "rapport_building" or "active_listening". What went well—be specific to behaviors visible in the transcript.
+- coaching.strengths: 0–6 items. May be empty if there were genuinely no strengths. The "skill" field MUST be exactly one of: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — do not invent names like "rapport_building" or "active_listening". What went well—be specific to behaviors visible in the transcript.
 - coaching.improvementAreas: 1–6 items. The "skill" field MUST be exactly one of: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — do not invent names. What to improve—tie to skills and concrete gaps (not generic negativity).
-- coaching.keyMoments: 2–6 items. The "skill" field MUST be exactly one of: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — do not invent names. Each moment must reference the NUMBERED transcript (e.g. turn [3] or a short quote from USER/ASSISTANT lines). Optional customerMessage/userMessage: short excerpts from those turns when helpful.
+- coaching.keyMoments: 0–6 items. May be empty if the conversation was too short to identify moments. The "skill" field MUST be exactly one of: discovery_questions, objection_handling, product_knowledge, closing, storytelling, empathy — do not invent names. Each moment must reference the NUMBERED transcript (e.g. turn [3] or a short quote from USER/ASSISTANT lines). Optional customerMessage/userMessage: short excerpts from those turns when helpful.
 - coaching.nextTimeFocus: 1–5 short bullets for the next practice session.
-- coaching.overallCoachingSummary: 2–5 sentences; supportive, specific, actionable—like a coach debrief.
+- coaching.overallCoachingSummary: REQUIRED. 2–5 sentences; supportive, specific, actionable—like a coach debrief. Always include this even if the interaction was brief.
 - Tone: professional, encouraging, never insulting.`;
 
     const userPrompt = `Customer persona name: ${input.personaName}

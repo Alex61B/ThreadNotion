@@ -33,9 +33,9 @@ const keyMomentSchema = z.object({
 
 /** Transcript-grounded coaching narrative (Phase 3). */
 export const CoachingFeedbackBlockSchema = z.object({
-  strengths: z.array(coachingSkillLine).min(1).max(6),
+  strengths: z.array(coachingSkillLine).max(6),
   improvementAreas: z.array(coachingSkillLine).min(1).max(6),
-  keyMoments: z.array(keyMomentSchema).min(2).max(6),
+  keyMoments: z.array(keyMomentSchema).max(6),
   nextTimeFocus: z.array(z.string().min(1)).min(1).max(5),
   overallCoachingSummary: z.string().min(1).max(4000),
 });
