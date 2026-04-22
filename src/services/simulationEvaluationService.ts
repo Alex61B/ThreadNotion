@@ -7,6 +7,8 @@ import { mergeRecommendedTips } from '../domain/coaching/mergeRecommendedTips';
 import { computeTranscriptMetrics, formatTranscriptNumbered } from './transcriptMetrics';
 import { llm } from './llm';
 import { updateProfilesAfterSimulation } from './weaknessProfileService';
+import { runMomentCoaching } from './momentCoachingService';
+import type { MomentCoachingResult } from '../schemas/momentCoaching';
 import { Prisma } from '../../generated/prisma';
 import type { SalesSkill as PrismaSkill } from '../../generated/prisma';
 
@@ -83,6 +85,22 @@ export async function evaluateConversation(conversationId: string) {
 
   const rawJson = storedEvaluator as unknown as Record<string, unknown>;
 
+  let momentCoachingResult: MomentCoachingResult | null = null;
+  try {
+    momentCoachingResult = await runMomentCoaching({
+      messages: convo.messages,
+      transcript,
+      personaName: convo.persona?.name ?? '',
+    });
+  } catch (err) {
+    console.error('[evaluateConversation] moment coaching failed, continuing without it', err);
+  }
+
+  const momentCoachingJson =
+    momentCoachingResult !== null
+      ? (momentCoachingResult as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+
   await prisma.$transaction(async (tx) => {
     await tx.simulationSkillScore.deleteMany({ where: { conversationId } });
 
@@ -97,6 +115,7 @@ export async function evaluateConversation(conversationId: string) {
         weaknesses: weaknesses as unknown as Prisma.InputJsonValue,
         recommendedTips: mergedTips as unknown as Prisma.InputJsonValue,
         rawEvaluatorOutput: rawJson as Prisma.InputJsonValue,
+        momentCoachingEntries: momentCoachingJson,
       },
       update: {
         userId: convo.userId,
@@ -106,6 +125,7 @@ export async function evaluateConversation(conversationId: string) {
         weaknesses: weaknesses as unknown as Prisma.InputJsonValue,
         recommendedTips: mergedTips as unknown as Prisma.InputJsonValue,
         rawEvaluatorOutput: rawJson as Prisma.InputJsonValue,
+        momentCoachingEntries: momentCoachingJson,
       },
     });
 
@@ -148,6 +168,7 @@ export async function evaluateConversation(conversationId: string) {
     summary: summary!,
     skillScores: scores,
     weaknessProfile: profiles,
+    momentCoaching: momentCoachingResult,
   };
 }
 

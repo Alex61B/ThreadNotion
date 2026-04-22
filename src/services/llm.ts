@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
 import { EvaluationError } from '../errors/evaluationErrors';
+import type { PlaybookStep, ExampleResponse } from '../domain/coaching/momentPlaybooks';
+import type { MomentType } from '../schemas/momentCoaching';
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -40,6 +42,32 @@ export type EvaluateSalesSkillsInput = {
     avgMessageLength: number;
     talkRatio: number;
   };
+};
+
+export type MomentClassificationInput = {
+  transcript: string;
+  momentTypeDescriptions: Array<{
+    id: string;
+    label: string;
+    customerSignals: string[];
+  }>;
+};
+
+export type MomentEvaluationInput = {
+  transcript: string;
+  personaName: string;
+  momentsToEvaluate: Array<{
+    momentType: MomentType;
+    label: string;
+    customerExcerpt: string;
+    associateExcerpt: string;
+    customerTurnIndex: number;
+    associateTurnIndex: number;
+    playbookSteps: PlaybookStep[];
+    strongExample: ExampleResponse;
+    weakExample: ExampleResponse;
+    coachingGuidance: string;
+  }>;
 };
 
 export const llm = {
@@ -180,6 +208,120 @@ ${input.transcript}`;
         'EVALUATOR_PARSE',
         err
       );
+    }
+  },
+
+  async classifyConversationMoments(input: MomentClassificationInput): Promise<unknown> {
+    const systemPrompt = `You are an expert retail sales training analyst. Identify specific "conversational moments" \
+in a fashion/apparel sales transcript — (customer message, associate response) pairs where the customer expressed \
+a concern, need, or buying signal that called for a specific sales skill.
+
+Only flag moments that are clearly present. Do not invent moments from vague or neutral exchanges.
+
+Return ONLY valid JSON (no markdown) matching this exact shape:
+{
+  "detectedMoments": [
+    {
+      "momentType": "<id from the provided list>",
+      "customerTurnIndex": <1-based turn number from transcript>,
+      "associateTurnIndex": <1-based turn number from transcript>,
+      "customerExcerpt": "<short quote from customer turn, max 200 chars>",
+      "associateExcerpt": "<short quote from associate turn, max 200 chars>",
+      "confidence": "high" | "medium"
+    }
+  ]
+}
+
+Rules:
+- momentType MUST be one of the IDs from the provided moment type list.
+- customerTurnIndex and associateTurnIndex are the [n] numbers from the numbered transcript.
+- Only include moments with confidence "high" or "medium". Skip low-confidence or ambiguous cases.
+- detectedMoments may be an empty array if no clear moments are present.
+- Maximum 6 detected moments per transcript.
+- Prefer quality over quantity — 2 precise detections are better than 5 uncertain ones.`;
+
+    const userPrompt = `Moment types to detect:
+${JSON.stringify(input.momentTypeDescriptions, null, 2)}
+
+Numbered transcript (USER = sales associate, ASSISTANT = customer):
+${input.transcript}`;
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? '{}';
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch (err) {
+      console.error('[llm.classifyConversationMoments] Malformed JSON from classifier model');
+      throw new EvaluationError('Moment classifier returned malformed JSON', 'EVALUATOR_PARSE', err);
+    }
+  },
+
+  async evaluateMomentResponses(input: MomentEvaluationInput): Promise<unknown> {
+    const systemPrompt = `You are an expert retail sales coach evaluating a training transcript. \
+For each conversational moment provided, assess how well the sales associate (USER messages) \
+handled it against the provided playbook steps.
+
+Be directional and fair — a step is "addressed" if the associate clearly attempted it, even imperfectly. \
+You are looking for whether the spirit of each step was present, not an exact word-for-word match.
+
+Return ONLY valid JSON (no markdown) matching this exact shape:
+{
+  "momentEvaluations": [
+    {
+      "momentType": "<same id as in input>",
+      "overallHandling": "strong" | "partial" | "missed",
+      "stepResults": [
+        {
+          "stepNumber": <number>,
+          "addressed": true | false,
+          "observation": "<one sentence: what they did or failed to do>"
+        }
+      ],
+      "missedStepNumbers": [<step numbers the associate skipped or failed>],
+      "betterResponseExample": "<2–4 sentence example of a stronger response grounded in the actual customer excerpt>",
+      "coachingSummary": "<2–3 sentences: what happened, what was missed, what to try next time>"
+    }
+  ]
+}
+
+Rules:
+- momentEvaluations MUST contain one entry per moment in the input, in the same order.
+- overallHandling: "strong" = 3 or more steps addressed; "partial" = 1 or 2 steps addressed; "missed" = 0 steps addressed.
+- stepResults must include one entry per playbook step for that moment.
+- betterResponseExample must be grounded in the actual customer excerpt — not a generic template.
+- Tone: specific, encouraging, constructive. Never harsh or condescending.`;
+
+    const userPrompt = `Customer persona: ${input.personaName}
+
+Full transcript for context:
+${input.transcript}
+
+Moments to evaluate (${input.momentsToEvaluate.length} total):
+${JSON.stringify(input.momentsToEvaluate, null, 2)}`;
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? '{}';
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch (err) {
+      console.error('[llm.evaluateMomentResponses] Malformed JSON from rubric model');
+      throw new EvaluationError('Moment rubric evaluator returned malformed JSON', 'EVALUATOR_PARSE', err);
     }
   },
 

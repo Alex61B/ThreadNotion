@@ -237,11 +237,12 @@ model SimulationEvaluationSummary {
   questionCount      Int
   avgMessageLength   Float
   talkRatio          Float
-  weaknesses         Json
-  recommendedTips    Json
-  rawEvaluatorOutput Json
-  createdAt          DateTime     @default(now())
-  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  weaknesses            Json
+  recommendedTips       Json
+  rawEvaluatorOutput    Json
+  momentCoachingEntries Json?
+  createdAt             DateTime     @default(now())
+  conversation          Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

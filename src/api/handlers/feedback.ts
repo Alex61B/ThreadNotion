@@ -53,6 +53,7 @@ export async function postFeedback(rawBody: unknown): Promise<JsonHandlerResult>
             createdAt: p.createdAt.toISOString(),
             updatedAt: p.updatedAt.toISOString(),
           })),
+          momentCoaching: result.momentCoaching ?? null,
         },
         ...(progressBundle
           ? {
